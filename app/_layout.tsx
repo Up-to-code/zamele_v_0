@@ -1,24 +1,60 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+import { ClerkProvider } from "@clerk/clerk-expo";
+import { tokenCache } from "@clerk/clerk-expo/token-cache";
+import { ConvexProvider } from "convex/react";
+import { useFonts } from "expo-font";
+import { Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+import { convex } from "../lib/convexClient";
+import { usePersistUserStore } from "../lib/hooks/usePersistUserStore";
+import { useSyncUser } from "../lib/hooks/useSyncUser";
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
+// إعداد شاشة البداية (Splash)
+SplashScreen.setOptions({
+  duration: 1000,
+  fade: true,
+});
 
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+SplashScreen.preventAutoHideAsync();
+
+const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const [loaded] = useFonts({
+    Cairo_Bold: require("../assets/fonts/Cairo-Bold.ttf"),
+    Cairo_Medium: require("../assets/fonts/Cairo-Medium.ttf"),
+  });
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hide();
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return null;
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <ClerkProvider tokenCache={tokenCache} publishableKey={CLERK_PUBLISHABLE_KEY!}>
+      <ConvexProvider client={convex}>
+        <SyncWrapper />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: "fade",
+            contentStyle: {
+              backgroundColor: "#fff",
+            },
+          }}
+        />
+      </ConvexProvider>
+    </ClerkProvider>
   );
+}
+
+function SyncWrapper() {
+  useSyncUser();
+  usePersistUserStore();
+  return null;
 }
