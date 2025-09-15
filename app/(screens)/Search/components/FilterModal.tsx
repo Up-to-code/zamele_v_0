@@ -1,15 +1,9 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  Switch,
-  Modal,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { FilterState, FILTER_OPTIONS, colorPalette } from '../types';
+import { colors } from '@/config/constants/colors';
+import { ArabicTranslations } from '@/config/constants/translations';
+import { FilterState, ResultType } from '../types';
 
 interface FilterModalProps {
   visible: boolean;
@@ -26,42 +20,64 @@ const FilterModal: React.FC<FilterModalProps> = ({
   filters,
   handleFilterChange,
   applyFilters,
-  resetFilters,
+  resetFilters
 }) => {
+  const getSortLabel = (sort: string) => {
+    switch(sort) {
+      case 'relevance': return ArabicTranslations.relevance;
+      case 'rating': return ArabicTranslations.rating;
+      case 'newest': return ArabicTranslations.newest;
+      case 'price_low': return ArabicTranslations.priceLow;
+      case 'price_high': return ArabicTranslations.priceHigh;
+      default: return sort;
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch(type) {
+      case 'all': return ArabicTranslations.all;
+      case 'account': return ArabicTranslations.accounts;
+      case 'group': return ArabicTranslations.groups;
+      case 'course': return ArabicTranslations.courses;
+      case 'event': return ArabicTranslations.events;
+      default: return type;
+    }
+  };
+
   return (
     <Modal
-      visible={visible}
-      transparent={true}
       animationType="slide"
+      transparent={true}
+      visible={visible}
       onRequestClose={onRequestClose}
     >
-      <View style={styles.modalContainer}>
+      <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>فلاتر البحث</Text>
+            <Text style={styles.modalTitle}>{ArabicTranslations.filters}</Text>
             <TouchableOpacity onPress={onRequestClose}>
-              <Ionicons name="close" size={24} color={colorPalette.textBlack} />
+              <Ionicons name="close" size={24} color={colors.darkGray} />
             </TouchableOpacity>
           </View>
           
-          <ScrollView style={styles.filtersContainer}>
+          <ScrollView style={styles.filterOptions}>
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>نوع المحتوى</Text>
-              <View style={styles.filterOptions}>
-                {FILTER_OPTIONS.type.map(option => (
+              <Text style={styles.filterSectionTitle}>{ArabicTranslations.type}</Text>
+              <View style={styles.filterOptionsRow}>
+                {['all', 'account', 'group', 'course', 'event'].map((type) => (
                   <TouchableOpacity
-                    key={option.value}
+                    key={type}
                     style={[
                       styles.filterOption,
-                      filters.type === option.value && styles.filterOptionActive
+                      filters.type === type && styles.selectedFilterOption
                     ]}
-                    onPress={() => handleFilterChange('type', option.value)}
+                    onPress={() => handleFilterChange('type', type)}
                   >
                     <Text style={[
                       styles.filterOptionText,
-                      filters.type === option.value && styles.filterOptionTextActive
+                      filters.type === type && styles.selectedFilterOptionText
                     ]}>
-                      {option.label}
+                      {getTypeLabel(type)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -69,22 +85,22 @@ const FilterModal: React.FC<FilterModalProps> = ({
             </View>
             
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>ترتيب النتائج</Text>
-              <View style={styles.filterOptions}>
-                {FILTER_OPTIONS.sort.map(option => (
+              <Text style={styles.filterSectionTitle}>{ArabicTranslations.sortBy}</Text>
+              <View style={styles.filterOptionsColumn}>
+                {['relevance', 'rating', 'newest', 'price_low', 'price_high'].map((sort) => (
                   <TouchableOpacity
-                    key={option.value}
+                    key={sort}
                     style={[
                       styles.filterOption,
-                      filters.sort === option.value && styles.filterOptionActive
+                      filters.sort === sort && styles.selectedFilterOption
                     ]}
-                    onPress={() => handleFilterChange('sort', option.value)}
+                    onPress={() => handleFilterChange('sort', sort)}
                   >
                     <Text style={[
                       styles.filterOptionText,
-                      filters.sort === option.value && styles.filterOptionTextActive
+                      filters.sort === sort && styles.selectedFilterOptionText
                     ]}>
-                      {option.label}
+                      {getSortLabel(sort)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -92,69 +108,37 @@ const FilterModal: React.FC<FilterModalProps> = ({
             </View>
             
             <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>السعر</Text>
-              <View style={styles.filterOptions}>
-                {FILTER_OPTIONS.price.map(option => (
+              <Text style={styles.filterSectionTitle}>{ArabicTranslations.price}</Text>
+              <View style={styles.filterOptionsRow}>
+                {['any', 'free', 'paid'].map((price) => (
                   <TouchableOpacity
-                    key={option.value}
+                    key={price}
                     style={[
                       styles.filterOption,
-                      filters.price === option.value && styles.filterOptionActive
+                      filters.price === price && styles.selectedFilterOption
                     ]}
-                    onPress={() => handleFilterChange('price', option.value)}
+                    onPress={() => handleFilterChange('price', price)}
                   >
                     <Text style={[
                       styles.filterOptionText,
-                      filters.price === option.value && styles.filterOptionTextActive
+                      filters.price === price && styles.selectedFilterOptionText
                     ]}>
-                      {option.label}
+                      {price === 'any' ? ArabicTranslations.any : 
+                       price === 'free' ? ArabicTranslations.free : 
+                       ArabicTranslations.paid}
                     </Text>
                   </TouchableOpacity>
                 ))}
-              </View>
-            </View>
-            
-            <View style={styles.filterSection}>
-              <Text style={styles.filterLabel}>التقييم</Text>
-              <View style={styles.filterOptions}>
-                {FILTER_OPTIONS.rating.map(option => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.filterOption,
-                      filters.rating === option.value && styles.filterOptionActive
-                    ]}
-                    onPress={() => handleFilterChange('rating', option.value)}
-                  >
-                    <Text style={[
-                      styles.filterOptionText,
-                      filters.rating === option.value && styles.filterOptionTextActive
-                    ]}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            
-            <View style={styles.filterSection}>
-              <View style={styles.switchFilter}>
-                <Text style={styles.switchLabel}>عرض المجاني فقط</Text>
-                <Switch
-                  value={filters.freeOnly}
-                  onValueChange={(value) => handleFilterChange('freeOnly', value)}
-                  trackColor={{ false: '#767577', true: colorPalette.primaryBlue }}
-                />
               </View>
             </View>
           </ScrollView>
           
-          <View style={styles.modalFooter}>
+          <View style={styles.modalActions}>
             <TouchableOpacity style={styles.resetButton} onPress={resetFilters}>
-              <Text style={styles.resetButtonText}>إعادة الضبط</Text>
+              <Text style={styles.resetButtonText}>{ArabicTranslations.reset}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.applyButton} onPress={applyFilters}>
-              <Text style={styles.applyButtonText}>تطبيق الفلاتر</Text>
+              <Text style={styles.applyButtonText}>{ArabicTranslations.applyFilters}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -164,112 +148,99 @@ const FilterModal: React.FC<FilterModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colorPalette.cardWhite,
+    backgroundColor: colors.white,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    maxHeight: '80%',
+    maxHeight: '60%',
   },
   modalHeader: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colorPalette.borderLightGray,
+    borderBottomColor: colors.lightGray,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: colorPalette.textBlack,
+    fontFamily: 'Cairo_600SemiBold',
+    color: colors.darkGray,
+    textAlign: 'right',
   },
-  filtersContainer: {
+  filterOptions: {
     padding: 16,
   },
   filterSection: {
     marginBottom: 24,
   },
-  filterLabel: {
+  filterSectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: colorPalette.textBlack,
+    fontFamily: 'Cairo_600SemiBold',
+    color: colors.darkGray,
     marginBottom: 12,
     textAlign: 'right',
   },
-  filterOptions: {
-    flexDirection: 'row',
+  filterOptionsRow: {
+    flexDirection: 'row-reverse',
     flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    marginHorizontal: -4,
+    gap: 8,
+  },
+  filterOptionsColumn: {
+    gap: 8,
   },
   filterOption: {
-    paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colorPalette.borderLightGray,
-    marginLeft: 8,
-    marginBottom: 8,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: colors.lightGray,
   },
-  filterOptionActive: {
-    backgroundColor: colorPalette.primaryBlue,
-    borderColor: colorPalette.primaryBlue,
+  selectedFilterOption: {
+    backgroundColor: colors.primary,
   },
   filterOptionText: {
     fontSize: 14,
-    color: colorPalette.textBlack,
-  },
-  filterOptionTextActive: {
-    color: colorPalette.cardWhite,
-  },
-  switchFilter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  switchLabel: {
-    fontSize: 16,
-    color: colorPalette.textBlack,
+    fontFamily: 'Cairo_400Regular',
+    color: colors.darkGray,
     textAlign: 'right',
   },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  selectedFilterOptionText: {
+    color: colors.white,
+  },
+  modalActions: {
+    flexDirection: 'row-reverse',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: colorPalette.borderLightGray,
+    borderTopColor: colors.lightGray,
   },
   resetButton: {
     flex: 1,
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colorPalette.borderLightGray,
-    borderRadius: 12,
-    marginRight: 12,
+    backgroundColor: colors.lightGray,
+    borderBottomRightRadius: 16,
   },
   resetButtonText: {
     fontSize: 16,
-    color: colorPalette.textBlack,
+    fontFamily: 'Cairo_600SemiBold',
+    color: colors.darkGray,
   },
   applyButton: {
     flex: 1,
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colorPalette.primaryBlue,
-    borderRadius: 12,
+    backgroundColor: colors.primary,
+    borderBottomLeftRadius: 16,
   },
   applyButtonText: {
     fontSize: 16,
-    color: colorPalette.cardWhite,
-    fontWeight: 'bold',
+    fontFamily: 'Cairo_600SemiBold',
+    color: colors.white,
   },
 });
 

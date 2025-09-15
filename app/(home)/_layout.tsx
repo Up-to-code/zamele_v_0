@@ -17,7 +17,7 @@ export default function RootLayout() {
                 onNotificationsPress={() =>
                   router.push("/(screens)/NotificationsScreen")
                 }
-                onSearchPress={() => router.push("/(screens)/Search/index")}
+                onSearchPress={() => router.push("/(screens)/Search")}
                 name={name}
                 plan={plan}
                 // avatarUrl={avatarUrl}

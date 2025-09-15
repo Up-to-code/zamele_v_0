@@ -46,10 +46,13 @@ const ProfileScreen = () => {
       path: "/(screens)/settings",
     },
     { id: "4", title: "تعديل الملف", icon: "pencil", color: colorPalette.primaryBlue 
- , path: "/(screens)/account/EditAccountScreen"
+ , path: "/(screens)/account/EditAccountScreen" , icon: "policies"
 
     },
     { id: "5", title: "المساعدة", icon: "help-circle", color: colorPalette.primaryBlue },
+    { id: "6", title: "السياسات", icon: "policies", color: colorPalette.primaryBlue  ,path: "/(screens)/account/policies" 
+
+    },
   ];
 
   const handleEmailCopy = async () => {

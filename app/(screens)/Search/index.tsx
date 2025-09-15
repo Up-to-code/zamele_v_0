@@ -1,131 +1,442 @@
-import React, { useState, useCallback } from 'react';
-import { SafeAreaView, StatusBar, StyleSheet } from 'react-native';
-import SearchHeader from './components/SearchHeader';
-import SearchResults from './components/SearchResults';
-import FilterModal from './components/FilterModal';
-import { MOCK_SEARCH_RESULTS, FilterState, SearchResult, colorPalette } from './types';
+import React from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { colors } from "@/config/constants/colors";
+import { ArabicTranslations } from "@/config/constants/translations";
+import { FilterState, ResultType } from "./types";
 
-const SearchScreen: React.FC = () => {
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState<boolean>(false);
-  const [showFilters, setShowFilters] = useState<boolean>(false);
-  const [filters, setFilters] = useState<FilterState>({
-    type: 'all',
-    sort: 'relevance',
-    price: 'any',
-    rating: 'any',
-    freeOnly: false,
-  });
+interface FilterModalProps {
+  visible: boolean;
+  onRequestClose: () => void;
+  filters: FilterState;
+  handleFilterChange: (
+    category: keyof FilterState,
+    value: string | boolean
+  ) => void;
+  applyFilters: () => void;
+  resetFilters: () => void;
+}
 
-  const handleSearch = useCallback(() => {
-    if (!searchQuery.trim()) {
-      setResults([]);
-      return;
+const FilterModal: React.FC<FilterModalProps> = ({
+  visible,
+  onRequestClose,
+  filters,
+  handleFilterChange,
+  applyFilters,
+  resetFilters,
+}) => {
+  const getSortLabel = (sort: string) => {
+    switch (sort) {
+      case "relevance":
+        return ArabicTranslations.relevance;
+      case "rating":
+        return ArabicTranslations.rating;
+      case "newest":
+        return ArabicTranslations.newest;
+      case "price_low":
+        return ArabicTranslations.priceLow;
+      case "price_high":
+        return ArabicTranslations.priceHigh;
+      default:
+        return sort;
     }
-
-    setIsSearching(true);
-    
-    // Simulate API call with timeout
-    setTimeout(() => {
-      const filteredResults = MOCK_SEARCH_RESULTS.filter(item => {
-        // Filter by search query
-        const matchesQuery = item.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            item.description.toLowerCase().includes(searchQuery.toLowerCase());
-        
-        // Filter by type
-        const matchesType = filters.type === 'all' || item.type === filters.type;
-        
-        // Filter by price
-        let matchesPrice = true;
-        if (filters.price === 'free') {
-          matchesPrice = !item.price || item.price === 0;
-        } else if (filters.price === 'paid') {
-          matchesPrice = !!item.price && item.price > 0;
-        }
-        
-        // Filter by rating
-        let matchesRating = true;
-        if (filters.rating !== 'any' && item.rating) {
-          matchesRating = item.rating >= parseInt(filters.rating);
-        }
-        
-        // Filter by free only
-        const matchesFreeOnly = !filters.freeOnly || !item.price || item.price === 0;
-        
-        return matchesQuery && matchesType && matchesPrice && matchesRating && matchesFreeOnly;
-      });
-      
-      // Sort results
-      let sortedResults = [...filteredResults];
-      if (filters.sort === 'rating') {
-        sortedResults.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-      } else if (filters.sort === 'newest') {
-        sortedResults.reverse();
-      } else if (filters.sort === 'price_low') {
-        sortedResults.sort((a, b) => (a.price || 0) - (b.price || 0));
-      } else if (filters.sort === 'price_high') {
-        sortedResults.sort((a, b) => (b.price || 0) - (a.price || 0));
-      }
-      
-      setResults(sortedResults);
-      setIsSearching(false);
-    }, 1000);
-  }, [searchQuery, filters]);
-
-  const handleFilterChange = (category: keyof FilterState, value: string | boolean) => {
-    setFilters(prev => ({ ...prev, [category]: value }));
   };
 
-  const applyFilters = () => {
-    setShowFilters(false);
-    handleSearch();
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case "all":
+        return ArabicTranslations.all;
+      case "account":
+        return ArabicTranslations.accounts;
+      case "group":
+        return ArabicTranslations.groups;
+      case "course":
+        return ArabicTranslations.courses;
+      case "event":
+        return ArabicTranslations.events;
+      default:
+        return type;
+    }
   };
 
-  const resetFilters = () => {
-    setFilters({
-      type: 'all',
-      sort: 'relevance',
-      price: 'any',
-      rating: 'any',
-      freeOnly: false,
-    });
+  const getPriceLabel = (price: string) => {
+    switch (price) {
+      case "any":
+        return ArabicTranslations.any;
+      case "free":
+        return ArabicTranslations.free;
+      case "paid":
+        return ArabicTranslations.paid;
+      default:
+        return price;
+    }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colorPalette.backgroundGray} />
-      
-      <SearchHeader
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        handleSearch={handleSearch}
-        setShowFilters={setShowFilters}
-      />
-      
-      <SearchResults
-        isSearching={isSearching}
-        results={results}
-        searchQuery={searchQuery}
-      />
-      
-      <FilterModal
-        visible={showFilters}
-        onRequestClose={() => setShowFilters(false)}
-        filters={filters}
-        handleFilterChange={handleFilterChange}
-        applyFilters={applyFilters}
-        resetFilters={resetFilters}
-      />
-    </SafeAreaView>
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onRequestClose}
+      accessibilityViewIsModal={true}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle} accessibilityRole="header">
+              {ArabicTranslations.filters}
+            </Text>
+            <TouchableOpacity
+              onPress={onRequestClose}
+              accessibilityLabel="إغلاق الفلاتر"
+              accessibilityRole="button"
+            >
+              <Ionicons name="close" size={24} color={colors.darkGray} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.filterOptions}>
+            <View style={styles.filterSection}>
+              <Text
+                style={styles.filterSectionTitle}
+                accessibilityRole="header"
+              >
+                {ArabicTranslations.type}
+              </Text>
+              <View style={styles.filterOptionsRow}>
+                {["all", "account", "group", "course", "event"].map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.filterOption,
+                      filters.type === type && styles.selectedFilterOption,
+                    ]}
+                    onPress={() => handleFilterChange("type", type)}
+                    accessibilityLabel={getTypeLabel(type)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: filters.type === type }}
+                  >
+                    <Text
+                      style={[
+                        styles.filterOptionText,
+                        filters.type === type &&
+                          styles.selectedFilterOptionText,
+                      ]}
+                    >
+                      {getTypeLabel(type)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text
+                style={styles.filterSectionTitle}
+                accessibilityRole="header"
+              >
+                {ArabicTranslations.sortBy}
+              </Text>
+              <View style={styles.filterOptionsColumn}>
+                {[
+                  "relevance",
+                  "rating",
+                  "newest",
+                  "price_low",
+                  "price_high",
+                ].map((sort) => (
+                  <TouchableOpacity
+                    key={sort}
+                    style={[
+                      styles.filterOption,
+                      filters.sort === sort && styles.selectedFilterOption,
+                    ]}
+                    onPress={() => handleFilterChange("sort", sort)}
+                    accessibilityLabel={getSortLabel(sort)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: filters.sort === sort }}
+                  >
+                    <Text
+                      style={[
+                        styles.filterOptionText,
+                        filters.sort === sort &&
+                          styles.selectedFilterOptionText,
+                      ]}
+                    >
+                      {getSortLabel(sort)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text
+                style={styles.filterSectionTitle}
+                accessibilityRole="header"
+              >
+                {ArabicTranslations.price}
+              </Text>
+              <View style={styles.filterOptionsRow}>
+                {["any", "free", "paid"].map((price) => (
+                  <TouchableOpacity
+                    key={price}
+                    style={[
+                      styles.filterOption,
+                      filters.price === price && styles.selectedFilterOption,
+                    ]}
+                    onPress={() => handleFilterChange("price", price)}
+                    accessibilityLabel={getPriceLabel(price)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: filters.price === price }}
+                  >
+                    <Text
+                      style={[
+                        styles.filterOptionText,
+                        filters.price === price &&
+                          styles.selectedFilterOptionText,
+                      ]}
+                    >
+                      {getPriceLabel(price)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <Text
+                style={styles.filterSectionTitle}
+                accessibilityRole="header"
+              >
+                {ArabicTranslations.minimumRating}
+              </Text>
+              <View style={styles.filterOptionsRow}>
+                {["any", "4", "3", "2"].map((rating) => (
+                  <TouchableOpacity
+                    key={rating}
+                    style={[
+                      styles.filterOption,
+                      filters.rating === rating && styles.selectedFilterOption,
+                    ]}
+                    onPress={() => handleFilterChange("rating", rating)}
+                    accessibilityLabel={
+                      rating === "any"
+                        ? ArabicTranslations.any
+                        : `${rating}+ ${ArabicTranslations.stars}`
+                    }
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: filters.rating === rating }}
+                  >
+                    <Text
+                      style={[
+                        styles.filterOptionText,
+                        filters.rating === rating &&
+                          styles.selectedFilterOptionText,
+                      ]}
+                    >
+                      {rating === "any"
+                        ? ArabicTranslations.any
+                        : `${rating}+ ${ArabicTranslations.stars}`}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.filterSection}>
+              <View style={styles.switchOption}>
+                <Text style={styles.switchOptionText}>
+                  {ArabicTranslations.freeOnly}
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.toggleSwitch,
+                    filters.freeOnly && styles.toggleSwitchActive,
+                  ]}
+                  onPress={() =>
+                    handleFilterChange("freeOnly", !filters.freeOnly)
+                  }
+                  accessibilityLabel={ArabicTranslations.freeOnly}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: filters.freeOnly }}
+                >
+                  <View
+                    style={[
+                      styles.toggleKnob,
+                      filters.freeOnly && styles.toggleKnobActive,
+                    ]}
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={resetFilters}
+              accessibilityLabel={ArabicTranslations.reset}
+              accessibilityRole="button"
+            >
+              <Text style={styles.resetButtonText}>
+                {ArabicTranslations.reset}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.applyButton}
+              onPress={applyFilters}
+              accessibilityLabel={ArabicTranslations.applyFilters}
+              accessibilityRole="button"
+            >
+              <Text style={styles.applyButtonText}>
+                {ArabicTranslations.applyFilters}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: colorPalette.backgroundGray,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.lightGray,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "Cairo_Bold",
+    color: colors.darkGray,
+    textAlign: "right",
+  },
+  filterOptions: {
+    padding: 20,
+  },
+  filterSection: {
+    marginBottom: 24,
+  },
+  filterSectionTitle: {
+    fontSize: 16,
+    fontFamily: "Cairo_Bold",
+    color: colors.darkGray,
+    marginBottom: 12,
+    textAlign: "right",
+  },
+  filterOptionsRow: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  filterOptionsColumn: {
+    gap: 8,
+  },
+  filterOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: colors.lightGray,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  selectedFilterOption: {
+    backgroundColor: colors.primary,
+  },
+  filterOptionText: {
+    fontSize: 14,
+    fontFamily: "Cairo_Medium",
+    color: colors.darkGray,
+    textAlign: "center",
+  },
+  selectedFilterOptionText: {
+    color: colors.white,
+  },
+  switchOption: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  switchOptionText: {
+    fontSize: 16,
+    fontFamily: "Cairo_Medium",
+    color: colors.darkGray,
+    textAlign: "right",
+  },
+  toggleSwitch: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.lightGray,
+    padding: 2,
+    justifyContent: "center",
+  },
+  toggleSwitchActive: {
+    backgroundColor: colors.primary,
+  },
+  toggleKnob: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+  },
+  toggleKnobActive: {
+    alignSelf: "flex-end",
+  },
+  modalActions: {
+    flexDirection: "row-reverse",
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.lightGray,
+    gap: 12,
+  },
+  resetButton: {
+    flex: 1,
+    padding: 16,
+    alignItems: "center",
+    backgroundColor: colors.lightGray,
+    borderRadius: 12,
+  },
+  resetButtonText: {
+    fontSize: 16,
+    fontFamily: "Cairo_Bold",
+    color: colors.darkGray,
+  },
+  applyButton: {
+    flex: 1,
+    padding: 16,
+    alignItems: "center",
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+  },
+  applyButtonText: {
+    fontSize: 16,
+    fontFamily: "Cairo_Bold",
+    color: colors.white,
   },
 });
 
-export default SearchScreen;
+export default FilterModal;

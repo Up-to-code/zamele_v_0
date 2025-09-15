@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SearchResult , colorPalette } from '../types';
+import { SearchResult } from '../types';
 import SearchResultItem from './SearchResultItem';
+import { colors } from '@/config/constants/colors';
+import { ArabicTranslations } from '@/config/constants/translations';
  
-
 interface SearchResultsProps {
   isSearching: boolean;
   results: SearchResult[];
@@ -18,9 +19,9 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 }) => {
   if (isSearching) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colorPalette.primaryBlue} />
-        <Text style={styles.loadingText}>جاري البحث...</Text>
+      <View style={styles.centered} accessibilityLabel="جاري البحث">
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>{ArabicTranslations.searching}</Text>
       </View>
     );
   }
@@ -33,25 +34,25 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.resultsList}
         showsVerticalScrollIndicator={false}
+        accessibilityLabel="نتائج البحث"
       />
     );
   }
 
   if (searchQuery) {
     return (
-      <View style={styles.centered}>
-        <Ionicons name="search" size={60} color={colorPalette.textSecondaryGray} />
-        <Text style={styles.noResultsText}>لا توجد نتائج لبحثك</Text>
-        <Text style={styles.noResultsSubtext}>جرب استخدام كلمات أخرى أو تغيير الفلاتر</Text>
+      <View style={styles.centered} accessibilityLabel="لا توجد نتائج">
+        <Ionicons name="search" size={60} color={colors.gray} />
+        <Text style={styles.noResultsText}>{ArabicTranslations.noResults}</Text>
+        <Text style={styles.noResultsSubtext}>{ArabicTranslations.tryDifferent}</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.centered}>
-      <Ionicons name="search" size={60} color={colorPalette.textSecondaryGray} />
-      <Text style={styles.initialText}>ابحث عن المحتوى الذي تريد تعلمه</Text>
-      <Text style={styles.initialSubtext}>كورسات، مجموعات، مناقشات، وغيرها</Text>
+    <View style={styles.centered} accessibilityLabel="شاشة البحث">
+      <Ionicons name="search" size={60} color={colors.gray} />
+      <Text style={styles.initialText}>{ArabicTranslations.initialText}</Text>
     </View>
   );
 };
@@ -66,30 +67,30 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: colorPalette.textSecondaryGray,
+    fontFamily: 'Cairo_Medium',
+    color: colors.gray,
+    textAlign: 'right',
   },
   noResultsText: {
     marginTop: 16,
     fontSize: 18,
-    fontWeight: 'bold',
-    color: colorPalette.textBlack,
+    fontFamily: 'Cairo_Bold',
+    color: colors.darkGray,
+    textAlign: 'right',
   },
   noResultsSubtext: {
     marginTop: 8,
     fontSize: 14,
-    color: colorPalette.textSecondaryGray,
+    fontFamily: 'Cairo_Medium',
+    color: colors.gray,
     textAlign: 'center',
+    lineHeight: 22,
   },
   initialText: {
     marginTop: 16,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colorPalette.textBlack,
-  },
-  initialSubtext: {
-    marginTop: 8,
-    fontSize: 14,
-    color: colorPalette.textSecondaryGray,
+    fontSize: 16,
+    fontFamily: 'Cairo_Medium',
+    color: colors.gray,
     textAlign: 'center',
   },
   resultsList: {
