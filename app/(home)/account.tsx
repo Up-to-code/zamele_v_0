@@ -1,22 +1,19 @@
-import React from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  StatusBar,
-  Platform,
-  I18nManager,
-  Alert,
-  Linking,
-} from "react-native";
+import { useUserStore } from "@/lib/store/userStore";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { shortName } from "@/lib/shortName";
 import { router } from "expo-router";
-import { useUserStore } from "@/lib/store/userStore";
+import {
+  I18nManager,
+  Image,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 // Force RTL layout for Arabic
 I18nManager.forceRTL(true);
@@ -30,66 +27,73 @@ const colorPalette = {
   cardWhite: "#FFFFFF",
   borderLightGray: "#C6C6C8",
   textSecondaryGray: "#8E8E93",
+  systemOrange: "#FF9500",
 };
 
 const ProfileScreen = () => {
   const userProfileData = useUserStore();
 
+  // Simple email shortening function
+  const shortName = (email: string) => {
+    return email.split('@')[0];
+  };
+
   const profileMenuOptions = [
     {
       id: "1",
       title: "مجموعاتي",
-      icon: "people",
+      icon: "people-outline",
       color: colorPalette.primaryBlue,
     },
     {
       id: "2",
       title: "الأصدقاء",
-      icon: "person",
+      icon: "person-outline",
       color: colorPalette.primaryBlue,
     },
     {
       id: "3",
       title: "الإعدادات",
-      icon: "settings",
+      icon: "settings-outline",
       color: colorPalette.primaryBlue,
       path: "/(screens)/settings",
     },
     {
       id: "4",
       title: "تعديل الملف",
-      icon: "pencil",
+      icon: "create-outline",
       color: colorPalette.primaryBlue,
       path: "/(screens)/account/EditAccountScreen",
     },
     {
       id: "5",
       title: "المساعدة",
-      icon: "help-circle",
+      icon: "help-circle-outline",
       color: colorPalette.primaryBlue,
-      path: "/(screens)/help",
+      path: "/(screens)/help/",
     },
     {
       id: "6",
       title: "السياسات",
       color: colorPalette.primaryBlue,
       path: "/(screens)/policies",
-      icon: "document-text", // Changed to a valid icon
+      icon: "document-text-outline",
     },
   ];
 
   const handleEmailCopy = async () => {
     await Clipboard.setStringAsync(userProfileData.email);
-    Alert.alert("تم النسخ", "تم نسخ البريد الإلكتروني إلى الحافظة");
   };
 
   const handleEmailSend = () => {
     Linking.openURL(`mailto:${userProfileData.email}`);
   };
 
-  const navigateToScreen = (path: string | undefined) => {
-    if (path) {
-      router.push(path as any);
+  const navigateToScreen = (menuItem: any) => {
+
+    
+    if (menuItem.path) {
+      router.push(menuItem.path as any);
     }
   };
 
@@ -103,17 +107,10 @@ const ProfileScreen = () => {
       <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
+        contentInsetAdjustmentBehavior="automatic"
       >
         {/* Profile Header Section */}
         <View style={styles.profileHeaderSection}>
-          <View style={styles.userInformation}>
-            <Text style={styles.userNameText}>{userProfileData.name}</Text>
-            <TouchableOpacity onPress={handleEmailCopy}>
-              <Text style={styles.userEmailText}>
-                {shortName(userProfileData.email)}
-              </Text>
-            </TouchableOpacity>
-          </View>
           <View style={styles.profileImageContainer}>
             {userProfileData.avatarUrl ? (
               <Image
@@ -131,6 +128,74 @@ const ProfileScreen = () => {
               <Ionicons name="camera" size={16} color="white" />
             </TouchableOpacity>
           </View>
+          
+          <View style={styles.userInformation}>
+            <Text style={styles.userNameText}>{userProfileData.name}</Text>
+            <TouchableOpacity 
+              style={styles.emailContainer}
+              onPress={handleEmailCopy}
+            >
+              <Text style={styles.userEmailText}>
+                {shortName(userProfileData.email)}
+              </Text>
+              <Ionicons name="copy-outline" size={14} color={colorPalette.textSecondaryGray} />
+            </TouchableOpacity>
+            
+            {/* Verification Status Badge */}
+            {!userProfileData.isVerified && (
+              <TouchableOpacity 
+                style={styles.verificationBadge}
+                onPress={() => router.push("/(screens)/policies")}
+              >
+                <Ionicons name="warning" size={14} color={colorPalette.systemOrange} />
+                <Text style={styles.verificationText}>حساب غير موثق</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Quick Actions Section */}
+        <View style={styles.quickActionsContainer}>
+          <View style={styles.quickActionsRow}>
+            <TouchableOpacity style={styles.quickActionButton}>
+              <View
+                style={[
+                  styles.quickActionIcon,
+                  { backgroundColor: `${colorPalette.primaryBlue}15` },
+                ]}
+              >
+                <Ionicons name="share-outline" size={20} color={colorPalette.primaryBlue} />
+              </View>
+              <Text style={styles.quickActionText}>مشاركة</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickActionButton}>
+              <View
+                style={[
+                  styles.quickActionIcon,
+                  { backgroundColor: `${colorPalette.primaryBlue}15` },
+                ]}
+              >
+                <Ionicons name="person-add-outline" size={20} color={colorPalette.primaryBlue} />
+              </View>
+              <Text style={styles.quickActionText}>إضافة</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickActionButton}
+              onPress={handleEmailSend}
+            >
+              <View
+                style={[
+                  styles.quickActionIcon,
+                  { backgroundColor: `${colorPalette.primaryBlue}15` },
+                ]}
+              >
+                <Ionicons name="mail-outline" size={20} color={colorPalette.primaryBlue} />
+              </View>
+              <Text style={styles.quickActionText}>بريد</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Menu Options Section */}
@@ -139,7 +204,7 @@ const ProfileScreen = () => {
             <TouchableOpacity
               key={menuItem.id}
               style={styles.menuOptionItem}
-              onPress={() => navigateToScreen(menuItem.path)}
+              onPress={() => navigateToScreen(menuItem)}
             >
               <View
                 style={[
@@ -163,51 +228,6 @@ const ProfileScreen = () => {
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* Quick Actions Section */}
-        <View style={styles.quickActionsContainer}>
-          <Text style={styles.sectionHeaderText}>الإجراءات السريعة</Text>
-          <View style={styles.quickActionsRow}>
-            <TouchableOpacity style={styles.quickActionButton}>
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: colorPalette.primaryBlue },
-                ]}
-              >
-                <Ionicons name="share" size={20} color="white" />
-              </View>
-              <Text style={styles.quickActionText}>مشاركة</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.quickActionButton}>
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: colorPalette.primaryBlue },
-                ]}
-              >
-                <Ionicons name="person-add" size={20} color="white" />
-              </View>
-              <Text style={styles.quickActionText}>إضافة</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={handleEmailSend}
-            >
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: colorPalette.primaryBlue },
-                ]}
-              >
-                <Ionicons name="mail" size={20} color="white" />
-              </View>
-              <Text style={styles.quickActionText}>بريد</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </ScrollView>
     </View>
   );
@@ -220,30 +240,32 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    paddingTop:
-      Platform.OS === "android" ? (StatusBar.currentHeight || 0) + 20 : 60,
+    paddingTop: Platform.OS === "ios" ? 0 : (StatusBar.currentHeight || 0) + 20,
   },
   profileHeaderSection: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 32,
+    padding: 20,
+    marginBottom: 16,
+    backgroundColor: colorPalette.cardWhite,
+    borderBottomWidth: 1,
+    borderBottomColor: colorPalette.borderLightGray,
   },
   profileImageContainer: {
     position: "relative",
     marginLeft: 16,
   },
   profileImage: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    borderWidth: 3,
-    borderColor: colorPalette.primaryBlue,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 0.5,
+    borderColor: colorPalette.borderLightGray,
   },
   profileImageEditButton: {
     position: "absolute",
     bottom: 0,
-    left: 0,
+    right: 0,
     backgroundColor: colorPalette.primaryBlue,
     width: 28,
     height: 28,
@@ -259,35 +281,55 @@ const styles = StyleSheet.create({
   },
   userNameText: {
     fontSize: 22,
+    fontWeight: "600",
     color: colorPalette.textBlack,
     marginBottom: 4,
-    fontFamily: "Cairo_Bold",
+    fontFamily: "Cairo-Bold",
+  },
+  emailContainer: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
   },
   userEmailText: {
     fontSize: 15,
     color: colorPalette.textSecondaryGray,
-    fontFamily: "Cairo_Medium",
+    marginLeft: 4,
+    fontFamily: "Cairo-Regular",
   },
-
+  verificationBadge: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    backgroundColor: "#FFF4E5",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  verificationText: {
+    fontSize: 12,
+    color: colorPalette.systemOrange,
+    marginRight: 4,
+    fontFamily: "Cairo-SemiBold",
+  },
   menuOptionsContainer: {
     backgroundColor: colorPalette.cardWhite,
     borderRadius: 12,
-    marginHorizontal: 20,
-    paddingVertical: 8,
+    marginHorizontal: 16,
     marginBottom: 24,
+    overflow: "hidden",
   },
   menuOptionItem: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: colorPalette.borderLightGray,
   },
   menuOptionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 12,
@@ -296,24 +338,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colorPalette.textBlack,
     marginRight: 12,
-    fontFamily: "Cairo_Medium",
+    fontFamily: "Cairo-Regular",
   },
   flexSpacer: {
     flex: 1,
   },
   quickActionsContainer: {
     backgroundColor: colorPalette.cardWhite,
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 20,
-    marginBottom: 40,
-  },
-  sectionHeaderText: {
-    fontSize: 18,
-    color: colorPalette.textBlack,
+    paddingVertical: 16,
     marginBottom: 16,
-    textAlign: "right",
-    fontFamily: "Cairo_Bold",
   },
   quickActionsRow: {
     flexDirection: "row-reverse",
@@ -325,15 +358,15 @@ const styles = StyleSheet.create({
   quickActionIcon: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   quickActionText: {
-    fontSize: 14,
-    color: colorPalette.textBlack,
-    fontFamily: "Cairo_Medium",
+    fontSize: 12,
+    color: colorPalette.textSecondaryGray,
+    fontFamily: "Cairo-Regular",
   },
 });
 

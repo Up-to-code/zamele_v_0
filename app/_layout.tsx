@@ -23,6 +23,7 @@ export default function RootLayout() {
   const [loaded] = useFonts({
     Cairo_Bold: require("../assets/fonts/Cairo-Bold.ttf"),
     Cairo_Medium: require("../assets/fonts/Cairo-Medium.ttf"),
+    Cairo_Regular: require("../assets/fonts/Cairo-Regular.ttf"),
   });
 
   useEffect(() => {

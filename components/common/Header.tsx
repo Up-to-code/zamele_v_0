@@ -10,7 +10,6 @@ import {
   Platform 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { shortName } from '@/lib/shortName';
 
 // Set RTL to true for Arabic
 I18nManager.forceRTL(true);
@@ -27,7 +26,7 @@ export interface HeaderProps {
   notificationCount?: number;
   name?: string;
   plan?: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -43,10 +42,8 @@ const Header: React.FC<HeaderProps> = ({
   plan,
   avatarUrl
 }) => {
-  const handleBack = () => {
-    if (onBackPress) {
-      onBackPress();
-    }
+  const shortName = (name: string, maxLength: number = 1) => {
+    return name.substring(0, maxLength).toUpperCase();
   };
 
   return (
@@ -59,9 +56,6 @@ const Header: React.FC<HeaderProps> = ({
             <TouchableOpacity 
               onPress={onNotificationsPress} 
               style={styles.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Notifications"
-              
             >
               <Ionicons name="notifications-outline" size={22} color="#333" />
               {notificationCount > 0 && (
@@ -78,8 +72,6 @@ const Header: React.FC<HeaderProps> = ({
             <TouchableOpacity 
               onPress={onSearchPress} 
               style={styles.iconButton}
-              accessibilityRole="button"
-              accessibilityLabel="Search"
             >
               <Ionicons name="search" size={22} color="#333" />
             </TouchableOpacity>
@@ -99,10 +91,8 @@ const Header: React.FC<HeaderProps> = ({
         <View style={styles.rightArea}>
           {showBackButton ? (
             <TouchableOpacity 
-              onPress={handleBack} 
+              onPress={onBackPress} 
               style={styles.backButton}
-              accessibilityRole="button"
-              accessibilityLabel="Back"
             >
               <Ionicons name="chevron-forward" size={26} color="#007AFF" />
             </TouchableOpacity>
@@ -110,17 +100,21 @@ const Header: React.FC<HeaderProps> = ({
             <View style={styles.userInfo}>
               <View style={styles.namePlan}>
                 <Text style={styles.nameText} numberOfLines={1}>
-                  {shortName(name )}
+                  {name}
                 </Text>
                 {!!plan && (
                   <Text style={styles.planText}>{plan}</Text>
                 )}
               </View>
               {avatarUrl ? (
-                <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+                <Image 
+                  source={{ uri: avatarUrl }} 
+                  style={styles.avatar} 
+                  onError={(e) => console.log('Error loading avatar:', e.nativeEvent.error)}
+                />
               ) : (
                 <View style={styles.avatarPlaceholder}>
-                      <Text style={styles.avatarInitial}>{shortName(name , 2) || 'U'}</Text>
+                  <Text style={styles.avatarInitial}>{shortName(name, 2) || 'U'}</Text>
                 </View>
               )}
             </View>
@@ -134,7 +128,6 @@ const Header: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   wrapper: {
     backgroundColor: '#FFFFFF',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     height: 56,
@@ -143,8 +136,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E5EA',
+    marginBottom: 0,
+    paddingBottom: 0,
   },
   leftArea: {
     flexDirection: 'row',
@@ -183,14 +178,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#E5E5EA',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitial: {
     fontSize: 16,
-    color: '#666',
-    fontWeight: 'bold',
+    color: '#8E8E93',
+    fontWeight: '600',
   },
   namePlan: {
     alignItems: 'flex-end',
@@ -223,7 +218,7 @@ const styles = StyleSheet.create({
   badgeText: {
     color: 'white',
     fontSize: 11,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 });
 
