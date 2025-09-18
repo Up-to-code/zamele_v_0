@@ -1,19 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  Animated,
   FlatList,
-  I18nManager,
   Image,
   ListRenderItem,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   Platform,
   Pressable,
   RefreshControl,
@@ -22,23 +13,14 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  UIManager,
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { createMaterialTopTabNavigator, MaterialTopTabNavigationEventMap, MaterialTopTabNavigationOptions } from "@react-navigation/material-top-tabs";
+import { NavigationState, ParamListBase, TabNavigationState } from "@react-navigation/native";
+import { EventMapBase, NavigationHelpers, RouteProp } from "@react-navigation/native";
 
 // Constants
-const CONSTANTS = {
-  HEADER_MAX_HEIGHT: 200,
-  HEADER_MIN_HEIGHT: 90,
-  SCROLL_THRESHOLD: 300,
-  ANIMATION_THROTTLE: 16,
-  REFRESH_TIMEOUT: 1000,
-  MAX_RENDER_BATCH: 10,
-  WINDOW_SIZE: 10,
-  IMAGE_FADE_THRESHOLD: 150,
-} as const;
-
 const COLORS = {
   primary: "#007AFF",
   secondary: "#34C759",
@@ -69,7 +51,6 @@ interface Group extends BaseEntity {
   readonly description: string;
   readonly image: string;
   readonly isPrivate: boolean;
-  readonly bannerImage?: string;
 }
 
 interface Post extends BaseEntity {
@@ -115,260 +96,44 @@ interface LeaderboardEntry extends BaseEntity {
 type TabKey = "المشاركات" | "الفصول" | "الملفات" | "المتصدرين" | "معلومات";
 type FileFilter = "الكل" | "PDF" | "صورة" | "مثبت";
 
-// Enable RTL and LayoutAnimation
-I18nManager.allowRTL(true);
-I18nManager.forceRTL(true);
-
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
 // Header Component
 const GroupHeader = React.memo(({
   name,
   onBack,
-  scrollY,
 }: {
   name: string;
   onBack: () => void;
-  scrollY: Animated.Value;
 }) => {
   const insets = useSafeAreaInsets();
 
-  // Calculate header height based on scroll position
-  const headerHeight = scrollY.interpolate({
-    inputRange: [0, CONSTANTS.HEADER_MAX_HEIGHT - CONSTANTS.HEADER_MIN_HEIGHT],
-    outputRange: [CONSTANTS.HEADER_MAX_HEIGHT, CONSTANTS.HEADER_MIN_HEIGHT],
-    extrapolate: "clamp",
-  });
-
-  // Calculate header opacity based on scroll position
-  const headerOpacity = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, 1],
-    extrapolate: "clamp",
-  });
-
-  // Calculate header background opacity based on scroll position
-  const headerBackgroundOpacity = scrollY.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [0, 0.5, 1],
-    extrapolate: "clamp",
-  });
-
-  // Calculate button opacity based on scroll position
-  const buttonOpacity = scrollY.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [0, 0.7, 1],
-    extrapolate: "clamp",
-  });
-
   return (
-    <Animated.View
-      style={[
-        styles.header,
-        {
-          height: headerHeight,
-          paddingTop: insets.top,
-          backgroundColor: scrollY.interpolate({
-            inputRange: [0, 100],
-            outputRange: ['transparent', COLORS.background.secondary],
-            extrapolate: "clamp",
-          }),
-          borderBottomWidth: scrollY.interpolate({
-            inputRange: [0, 100],
-            outputRange: [0, StyleSheet.hairlineWidth],
-            extrapolate: "clamp",
-          }),
-        },
-      ]}
-    >
+    <View style={[styles.header, { paddingTop: insets.top }]}>
       <View style={styles.headerContent}>
-        <Animated.View style={{ opacity: buttonOpacity }}>
-          <TouchableOpacity onPress={onBack} style={styles.headerButton}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
-          </TouchableOpacity>
-        </Animated.View>
+        <TouchableOpacity onPress={onBack} style={styles.headerButton}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.text.primary} />
+        </TouchableOpacity>
 
-        <Animated.Text 
-          style={[
-            styles.headerTitle, 
-            {
-              opacity: headerOpacity,
-              transform: [{
-                translateY: scrollY.interpolate({
-                  inputRange: [0, 100],
-                  outputRange: [20, 0],
-                  extrapolate: "clamp",
-                })
-              }]
-            }
-          ]} 
-          numberOfLines={1}
-        >
+        <Text style={styles.headerTitle} numberOfLines={1}>
           {name}
-        </Animated.Text>
+        </Text>
 
-        <Animated.View style={{ opacity: buttonOpacity }}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Ionicons name="ellipsis-vertical" size={20} color={COLORS.text.primary} />
-          </TouchableOpacity>
-        </Animated.View>
+        <TouchableOpacity style={styles.headerButton}>
+          <Ionicons name="ellipsis-vertical" size={20} color={COLORS.text.primary} />
+        </TouchableOpacity>
       </View>
-    </Animated.View>
+    </View>
   );
 });
 
 GroupHeader.displayName = 'GroupHeader';
 
-// Banner Component
-const GroupBanner = React.memo(({ image, scrollY }: { image: string; scrollY: Animated.Value }) => {
-  const bannerHeight = scrollY.interpolate({
-    inputRange: [0, CONSTANTS.HEADER_MAX_HEIGHT - CONSTANTS.HEADER_MIN_HEIGHT],
-    outputRange: [CONSTANTS.HEADER_MAX_HEIGHT, CONSTANTS.HEADER_MIN_HEIGHT],
-    extrapolate: "clamp",
-  });
-
-  const bannerTranslateY = scrollY.interpolate({
-    inputRange: [0, CONSTANTS.HEADER_MAX_HEIGHT - CONSTANTS.HEADER_MIN_HEIGHT],
-    outputRange: [0, - (CONSTANTS.HEADER_MAX_HEIGHT - CONSTANTS.HEADER_MIN_HEIGHT) / 2],
-    extrapolate: "clamp",
-  });
-
-  const bannerOpacity = scrollY.interpolate({
-    inputRange: [0, CONSTANTS.HEADER_MAX_HEIGHT - CONSTANTS.HEADER_MIN_HEIGHT],
-    outputRange: [1, 0.8],
-    extrapolate: "clamp",
-  });
-
-  return (
-    <Animated.View
-      style={{
-        height: bannerHeight,
-        transform: [{ translateY: bannerTranslateY }],
-        opacity: bannerOpacity,
-        overflow: "hidden",
-      }}
-    >
-      <Image source={{ uri: image }} style={styles.banner} resizeMode="cover" />
-      <View style={styles.bannerOverlay} />
-    </Animated.View>
-  );
-});
-
-GroupBanner.displayName = 'GroupBanner';
-
-// Tab Navigation Component
-const TabNavigation = React.memo(({
-  tabs,
-  activeTab,
-  onTabChange,
-  scrollY,
-}: {
-  tabs: readonly TabKey[];
-  activeTab: TabKey;
-  onTabChange: (tab: TabKey) => void;
-  scrollY: Animated.Value;
-}) => {
-  const scrollViewRef = useRef<ScrollView>(null);
-
-  const handleTabPress = useCallback((tab: TabTabKey) => {
-    onTabChange(tab);
-  }, [onTabChange]);
-
-  const tabOpacity = scrollY.interpolate({
-    inputRange: [0, 50, 100],
-    outputRange: [0, 0.5, 1],
-    extrapolate: "clamp",
-  });
-
-  return (
-    <Animated.View style={{ opacity: tabOpacity }}>
-      <SafeAreaView edges={['right', 'left']} style={styles.tabContainer}>
-        <ScrollView
-          ref={scrollViewRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabScrollContent}
-          bounces={false}
-          scrollEventThrottle={CONSTANTS.ANIMATION_THROTTLE}
-          decelerationRate="fast"
-        >
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.activeTab]}
-              onPress={() => handleTabPress(tab)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: activeTab === tab }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
-                {tab}
-              </Text>
-              {activeTab === tab && <View style={styles.tabIndicator} />}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </SafeAreaView>
-    </Animated.View>
-  );
-});
-
-TabNavigation.displayName = 'TabNavigation';
-
-// Animated Image Component
-const AnimatedImage = React.memo(({ 
-  source, 
-  style, 
-  scrollY, 
-  accessibilityIgnoresInvertColors 
-}: {
-  source: { uri: string };
-  style: any;
-  scrollY: Animated.Value;
-  accessibilityIgnoresInvertColors?: boolean;
-}) => {
-  const imageOpacity = scrollY.interpolate({
-    inputRange: [0, CONSTANTS.IMAGE_FADE_THRESHOLD],
-    outputRange: [1, 0.3],
-    extrapolate: "clamp",
-  });
-
-  const imageScale = scrollY.interpolate({
-    inputRange: [0, CONSTANTS.IMAGE_FADE_THRESHOLD],
-    outputRange: [1, 0.9],
-    extrapolate: "clamp",
-  });
-
-  return (
-    <Animated.View
-      style={{
-        opacity: imageOpacity,
-        transform: [{ scale: imageScale }],
-      }}
-    >
-      <Image
-        source={source}
-        style={style}
-        resizeMode="cover"
-        accessibilityIgnoresInvertColors={accessibilityIgnoresInvertColors}
-      />
-    </Animated.View>
-  );
-});
-
-AnimatedImage.displayName = 'AnimatedImage';
-
 // Post Card Component
 const PostCard = React.memo(({
   post,
   onLike,
-  scrollY,
 }: {
   post: Post;
   onLike: (id: string) => void;
-  scrollY: Animated.Value;
 }) => {
   const handleLikePress = useCallback(() => {
     onLike(post.id);
@@ -377,10 +142,9 @@ const PostCard = React.memo(({
   return (
     <View style={styles.card}>
       <View style={styles.postHeader}>
-        <AnimatedImage
+        <Image
           source={{ uri: post.userAvatar }}
           style={styles.avatar}
-          scrollY={scrollY}
           accessibilityIgnoresInvertColors
         />
         <View style={styles.postInfo}>
@@ -435,17 +199,16 @@ const PostCard = React.memo(({
 PostCard.displayName = 'PostCard';
 
 // Classroom Card Component
-const ClassroomCard = React.memo(({ classroom, scrollY }: { classroom: Classroom; scrollY: Animated.Value }) => (
+const ClassroomCard = React.memo(({ classroom }: { classroom: Classroom }) => (
   <Pressable 
     style={({ pressed }) => [styles.card, pressed && styles.pressedCard]} 
     accessibilityRole="button"
     accessibilityLabel={`فصل دراسي: ${classroom.title} - ${classroom.progress}% مكتمل`}
   >
     <View style={styles.classroomHeader}>
-      <AnimatedImage
+      <Image
         source={{ uri: classroom.thumbnail }}
         style={styles.classroomThumbnail}
-        scrollY={scrollY}
         accessibilityIgnoresInvertColors
       />
       <View style={styles.classroomInfo}>
@@ -479,7 +242,7 @@ const ClassroomCard = React.memo(({ classroom, scrollY }: { classroom: Classroom
 ClassroomCard.displayName = 'ClassroomCard';
 
 // File Card Component
-const FileCard = React.memo(({ file, scrollY }: { file: FileItem; scrollY: Animated.Value }) => {
+const FileCard = React.memo(({ file }: { file: FileItem }) => {
   const getFileIconAndColor = (type: FileType): { icon: keyof typeof Ionicons.glyphMap; color: string } => {
     const fileTypeMap: Record<FileType, { icon: keyof typeof Ionicons.glyphMap; color: string }> = {
       pdf: { icon: "document-text", color: COLORS.error },
@@ -500,10 +263,9 @@ const FileCard = React.memo(({ file, scrollY }: { file: FileItem; scrollY: Anima
     >
       <View style={styles.fileHeader}>
         {file.thumbnail ? (
-          <AnimatedImage
+          <Image
             source={{ uri: file.thumbnail }}
             style={styles.fileThumbnail}
-            scrollY={scrollY}
             accessibilityIgnoresInvertColors
           />
         ) : (
@@ -632,7 +394,6 @@ const FileFilter = React.memo(({
       style={styles.filterContainer}
       contentContainerStyle={styles.filterContent}
       bounces={false}
-      decelerationRate="fast"
     >
       {filters.map((filter) => (
         <TouchableOpacity
@@ -663,32 +424,162 @@ const EmptyState = React.memo(({ tab }: { tab: string }) => (
 
 EmptyState.displayName = 'EmptyState';
 
-// Scroll to Top Button Component
-const ScrollToTopButton = React.memo(({
-  isVisible,
-  onPress,
-}: {
-  isVisible: boolean;
-  onPress: () => void;
-}) => {
-  const insets = useSafeAreaInsets();
-  
-  if (!isVisible) return null;
-  
-  return (
-    <TouchableOpacity
-      style={[styles.scrollToTopButton, { bottom: 90 + insets.bottom }]}
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel="الانتقال إلى الأعلى"
-      activeOpacity={0.8}
-    >
-      <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
-    </TouchableOpacity>
-  );
-});
+// Create Tab Navigator
+const Tab = createMaterialTopTabNavigator();
 
-ScrollToTopButton.displayName = 'ScrollToTopButton';
+// Tab Screens Props
+interface PostsScreenProps {
+  posts: Post[];
+  onLike: (id: string) => void;
+  refreshing: boolean;
+  onRefresh: () => void;
+  insets: { bottom: number };
+}
+
+interface ClassroomsScreenProps {
+  classrooms: Classroom[];
+  refreshing: boolean;
+  onRefresh: () => void;
+  insets: { bottom: number };
+}
+
+interface FilesScreenProps {
+  files: FileItem[];
+  fileFilter: FileFilter;
+  onFilterChange: (filter: FileFilter) => void;
+  refreshing: boolean;
+  onRefresh: () => void;
+  insets: { bottom: number };
+}
+
+interface LeaderboardScreenProps {
+  leaderboard: LeaderboardEntry[];
+  refreshing: boolean;
+  onRefresh: () => void;
+  insets: { bottom: number };
+}
+
+interface InfoScreenProps {
+  group: Group;
+  refreshing: boolean;
+  onRefresh: () => void;
+  insets: { bottom: number };
+}
+
+// Tab Screens
+const PostsScreen: React.FC<PostsScreenProps> = ({ posts, onLike, refreshing, onRefresh, insets }) => (
+  <FlatList
+    data={posts}
+    renderItem={({ item }) => <PostCard post={item} onLike={onLike} />}
+    keyExtractor={(item) => item.id}
+    refreshControl={
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        colors={[COLORS.primary]}
+        tintColor={COLORS.primary}
+        progressBackgroundColor={COLORS.background.secondary}
+      />
+    }
+    contentContainerStyle={{ paddingBottom: insets.bottom + 80 , paddingTop:  50 }}
+    ListEmptyComponent={<EmptyState tab="منشورات" />}
+    showsVerticalScrollIndicator={false}
+  />
+);
+
+const ClassroomsScreen: React.FC<ClassroomsScreenProps> = ({ classrooms, refreshing, onRefresh, insets }) => (
+  <FlatList
+    data={classrooms}
+    renderItem={({ item }) => <ClassroomCard classroom={item} />}
+    keyExtractor={(item) => item.id}
+    refreshControl={
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        colors={[COLORS.primary]}
+        tintColor={COLORS.primary}
+        progressBackgroundColor={COLORS.background.secondary}
+      />
+    }
+    contentContainerStyle={{ paddingBottom: insets.bottom + 80  , paddingTop:  50 }}
+    ListEmptyComponent={<EmptyState tab="فصول" />}
+    showsVerticalScrollIndicator={false}
+  />
+);
+
+const FilesScreen: React.FC<FilesScreenProps> = ({ files, fileFilter, onFilterChange, refreshing, onRefresh, insets }) => {
+  const filteredFiles = useMemo(() => {
+    if (fileFilter === "الكل") return files;
+    const filterMap: Record<Exclude<FileFilter, "الكل">, FileType> = {
+      PDF: "pdf",
+      صورة: "image",
+      مثبت: "pin",
+    };
+    const targetType = filterMap[fileFilter as Exclude<FileFilter, "الكل">];
+    return targetType ? files.filter(file => file.type === targetType) : files;
+  }, [fileFilter, files]);
+
+  return (
+    <View style={styles.flex}>
+      <FileFilter activeFilter={fileFilter} onFilterChange={onFilterChange} />
+      <FlatList
+        data={filteredFiles}
+        renderItem={({ item }) => <FileCard file={item} />}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+            progressBackgroundColor={COLORS.background.secondary}
+          />
+        }
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        ListEmptyComponent={<EmptyState tab="ملفات" />}
+        showsVerticalScrollIndicator={false}
+      />
+    </View>
+  );
+};
+
+const LeaderboardScreen: React.FC<LeaderboardScreenProps> = ({ leaderboard, refreshing, onRefresh, insets }) => (
+  <FlatList
+    data={leaderboard}
+    renderItem={({ item, index }) => <LeaderboardCard entry={item} index={index} />}
+    keyExtractor={(item) => item.id}
+    refreshControl={
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        colors={[COLORS.primary]}
+        tintColor={COLORS.primary}
+        progressBackgroundColor={COLORS.background.secondary}
+      />
+    }
+    contentContainerStyle={{ paddingBottom: insets.bottom + 80  , paddingTop:  50 }}
+    ListEmptyComponent={<EmptyState tab="متصدرين" />}
+    showsVerticalScrollIndicator={false}
+  />
+);
+
+const InfoScreen: React.FC<InfoScreenProps> = ({ group, refreshing, onRefresh, insets }) => (
+  <ScrollView
+    refreshControl={
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        colors={[COLORS.primary]}
+        tintColor={COLORS.primary}
+        progressBackgroundColor={COLORS.background.secondary}
+      />
+    }
+    contentContainerStyle={{ paddingBottom: insets.bottom + 80  , paddingTop:  50 }}
+    showsVerticalScrollIndicator={false}
+  >
+    <InfoSection group={group} />
+  </ScrollView>
+);
 
 // Main Component
 const GroupScreen: React.FC = () => {
@@ -697,20 +588,10 @@ const GroupScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
 
   // State
-  const [activeTab, setActiveTab] = useState<TabKey>("المشاركات");
   const [fileFilter, setFileFilter] = useState<FileFilter>("الكل");
   const [refreshing, setRefreshing] = useState(false);
-  const [showScrollToTop, setShowScrollToTop] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>("المشاركات");
   
-  // Refs
-  const scrollY = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef<FlatList>(null);
-
-  // Constants
-  const tabs = useMemo<readonly TabKey[]>(() => 
-    ["المشاركات", "الفصول", "الملفات", "المتصدرين", "معلومات"] as const, []
-  );
-
   // Mock Data
   const group = useMemo<Group>(() => ({
     id: groupId,
@@ -719,10 +600,9 @@ const GroupScreen: React.FC = () => {
     description: "مجتمع لمطوري React Native لمشاركة المعرفة والتعاون في المشاريع. نستضيف ورش عمل منتظمة ومراجعات للكود وفعاليات شبكة لمساعدة المطورين على تنمية مهاراتهم وحياتهم المهنية.",
     image: "https://images.unsplash.com/photo-1611224923853-80b023f02d71?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80",
     isPrivate: false,
-    bannerImage: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
   }), [groupId]);
 
-  const [posts, setPosts] = useState<readonly Post[]>([
+  const [posts, setPosts] = useState<Post[]>([
     {
       id: "1",
       userName: "أليكس جونسون",
@@ -775,7 +655,7 @@ const GroupScreen: React.FC = () => {
     },
   ]);
 
-  const classrooms = useMemo<readonly Classroom[]>(() => [
+  const classrooms = useMemo<Classroom[]>(() => [
     {
       id: "1",
       title: "أساسيات React Native",
@@ -795,12 +675,12 @@ const GroupScreen: React.FC = () => {
       completed: false,
       students: 35,
       assignments: 3,
-      thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&auto{format&fit=crop&w=200&q=80",
+      thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=80",
       shortDescription: "تعلم كيفية إنشاء تطبيقات تتكيف مع مختلف أحجام الشاشات.",
     },
   ], []);
 
-  const files = useMemo<readonly FileItem[]>(() => [
+  const files = useMemo<FileItem[]>(() => [
     {
       id: "1",
       name: "React_Native_Cheat_Sheet.pdf",
@@ -828,7 +708,7 @@ const GroupScreen: React.FC = () => {
     },
   ], []);
 
-  const leaderboard = useMemo<readonly LeaderboardEntry[]>(() => [
+  const leaderboard = useMemo<LeaderboardEntry[]>(() => [
     {
       id: "1",
       rank: 1,
@@ -841,7 +721,7 @@ const GroupScreen: React.FC = () => {
       id: "2",
       rank: 2,
       name: "سارة ميلر",
-      avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w{100&q=80",
+      avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=100&q=80",
       points: 1120,
       progress: 8,
     },
@@ -868,10 +748,6 @@ const GroupScreen: React.FC = () => {
     ));
   }, []);
 
-  const handleTabChange = useCallback((tab: TabKey) => {
-    setActiveTab(tab);
-  }, []);
-
   const handleFilterChange = useCallback((filter: FileFilter) => {
     setFileFilter(filter);
   }, []);
@@ -879,158 +755,83 @@ const GroupScreen: React.FC = () => {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, CONSTANTS.REFRESH_TIMEOUT));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     } finally {
       setRefreshing(false);
     }
   }, []);
 
-  const scrollToTop = useCallback(() => {
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-  }, []);
-
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    scrollY.setValue(offsetY);
-    setShowScrollToTop(offsetY > CONSTANTS.SCROLL_THRESHOLD);
-  }, [scrollY]);
-
   const handleBack = useCallback(() => {
     router.back();
   }, []);
-
-  // Computed values
-  const filteredFiles = useMemo(() => {
-    if (fileFilter === "الكل") return files;
-    const filterMap: Record<Exclude<FileFilter, "الكل">, FileType> = {
-      PDF: "pdf",
-      صورة: "image",
-      مثبت: "pin",
-    };
-    const targetType = filterMap[fileFilter as Exclude<FileFilter, "الكل">];
-    return targetType ? files.filter(file => file.type === targetType) : files;
-  }, [fileFilter, files]);
-
-  // Render functions
-  const keyExtractor = useCallback((item: BaseEntity) => item.id, []);
-
-  const renderPost: ListRenderItem<Post> = useCallback(({ item }) => (
-    <PostCard post={item} onLike={handleLike} scrollY={scrollY} />
-  ), [handleLike, scrollY]);
-
-  const renderClassroom: ListRenderItem<Classroom> = useCallback(({ item }) => (
-    <ClassroomCard classroom={item} scrollY={scrollY} />
-  ), [scrollY]);
-
-  const renderFile: ListRenderItem<FileItem> = useCallback(({ item }) => (
-    <FileCard file={item} scrollY={scrollY} />
-  ), [scrollY]);
-
-  const renderLeaderboard: ListRenderItem<LeaderboardEntry> = useCallback(({ item, index }) => (
-    <LeaderboardCard entry={item} index={index} />
-  ), []);
-
-  // Memoized components
-  const refreshControl = useMemo(() => (
-    <RefreshControl
-      refreshing={refreshing}
-      onRefresh={handleRefresh}
-      colors={[COLORS.primary]}
-      tintColor={COLORS.primary}
-      progressBackgroundColor={COLORS.background.secondary}
-    />
-  ), [refreshing, handleRefresh]);
-
-  // Modify the content container style
-  const contentContainerStyle = useMemo(() => ({
-    paddingBottom: insets.bottom + 80,
-  }), [insets.bottom]);
-
-  // Update the commonFlatListProps
-  const commonFlatListProps = useMemo(() => ({
-    ref: flatListRef,
-    showsVerticalScrollIndicator: false,
-    onScroll: handleScroll,
-    scrollEventThrottle: CONSTANTS.ANIMATION_THROTTLE,
-    refreshControl,
-    contentContainerStyle,
-    removeClippedSubviews: true,
-    maxToRenderPerBatch: CONSTANTS.MAX_RENDER_BATCH,
-    windowSize: CONSTANTS.WINDOW_SIZE,
-    keyExtractor,
-    initialNumToRender: 10,
-    maintainVisibleContentPosition: { minIndexForVisible: 0 },
-  }), [handleScroll, refreshControl, contentContainerStyle, keyExtractor]);
-
-  const renderContent = useCallback(() => {
-    switch (activeTab) {
-      case "المشاركات":
-        return (
-          <FlatList
-            {...commonFlatListProps}
-            data={posts}
-            renderItem={renderPost}
-            ListEmptyComponent={<EmptyState tab="منشورات" />}
-          />
-        );
-      case "الفصول":
-        return (
-          <FlatList
-            {...commonFlatListProps}
-            data={classrooms}
-            renderItem={renderClassroom}
-            ListEmptyComponent={<EmptyState tab="فصول" />}
-          />
-        );
-      case "الملفات":
-        return (
-          <View style={styles.flex}>
-            <FileFilter activeFilter={fileFilter} onFilterChange={handleFilterChange} />
-            <FlatList
-              {...commonFlatListProps}
-              data={filteredFiles}
-              renderItem={renderFile}
-              ListEmptyComponent={<EmptyState tab="ملفات" />}
-            />
-          </View>
-        );
-      case "المتصدرين":
-        return (
-          <FlatList
-            {...commonFlatListProps}
-            data={leaderboard}
-            renderItem={renderLeaderboard}
-            ListEmptyComponent={<EmptyState tab="متصدرين" />}
-          />
-        );
-      case "معلومات":
-        return (
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            onScroll={handleScroll}
-            scrollEventThrottle={CONSTANTS.ANIMATION_THROTTLE}
-            refreshControl={refreshControl}
-            contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-          >
-            <InfoSection group={group} />
-          </ScrollView>
-        );
-      default:
-        return null;
-    }
-  }, [activeTab, commonFlatListProps, posts, classrooms, filteredFiles, leaderboard, group, renderPost, renderClassroom, renderFile, renderLeaderboard, fileFilter, handleFilterChange, handleScroll, refreshControl, insets.bottom]);
 
   return (
     <SafeAreaView style={styles.container} edges={['right', 'left', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
       <View style={styles.content}>
-        <GroupBanner image={group.bannerImage ?? group.image} scrollY={scrollY} />
-        <GroupHeader name={group.name} onBack={handleBack} scrollY={scrollY} />
-        <TabNavigation tabs={tabs} activeTab={activeTab} onTabChange={handleTabChange} scrollY={scrollY} />
-        <View style={styles.tabContentContainer}>
-          {renderContent()}
-        </View>
+        <GroupHeader name={group.name} onBack={handleBack} />
+        
+        <Tab.Navigator
+          screenOptions={{
+            tabBarScrollEnabled: true,
+            tabBarItemStyle: { width: 'auto' },
+            tabBarStyle: styles.tabContainer,
+            tabBarLabelStyle: styles.tabText,
+            tabBarActiveTintColor: COLORS.primary,
+            tabBarInactiveTintColor: COLORS.text.tertiary,
+            tabBarIndicatorStyle: styles.tabIndicator,
+          }}
+          screenListeners={{
+            focus: (e: any) => {
+              setActiveTab(e.target?.split('-')[0] as TabKey);
+            }
+          }}
+        >
+          <Tab.Screen name="المشاركات">
+            {() => <PostsScreen 
+              posts={posts} 
+              onLike={handleLike} 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh} 
+              insets={{ bottom: insets.bottom }} 
+            />}
+          </Tab.Screen>
+          <Tab.Screen name="الفصول">
+            {() => <ClassroomsScreen 
+              classrooms={classrooms} 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh} 
+              insets={{ bottom: insets.bottom }} 
+            />}
+          </Tab.Screen>
+          <Tab.Screen name="الملفات">
+            {() => <FilesScreen 
+              files={files} 
+              fileFilter={fileFilter} 
+              onFilterChange={handleFilterChange} 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh} 
+              insets={{ bottom: insets.bottom }} 
+            />}
+          </Tab.Screen>
+          <Tab.Screen name="المتصدرين">
+            {() => <LeaderboardScreen 
+              leaderboard={leaderboard} 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh} 
+              insets={{ bottom: insets.bottom }} 
+            />}
+          </Tab.Screen>
+          <Tab.Screen name="معلومات">
+            {() => <InfoScreen 
+              group={group} 
+              refreshing={refreshing} 
+              onRefresh={handleRefresh} 
+              insets={{ bottom: insets.bottom }} 
+            />}
+          </Tab.Screen>
+        </Tab.Navigator>
       </View>
 
       {activeTab === "المشاركات" && (
@@ -1043,13 +844,11 @@ const GroupScreen: React.FC = () => {
           <Ionicons name="create" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       )}
-
-      <ScrollToTopButton isVisible={showScrollToTop} onPress={scrollToTop} />
     </SafeAreaView>
   );
 };
 
-// Update the styles
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1059,12 +858,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 100,
-    overflow: "hidden",
+    backgroundColor: COLORS.background.secondary,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.border,
   },
   headerContent: {
@@ -1072,7 +867,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    flex: 1,
+    height: 56,
   },
   headerButton: {
     padding: 8,
@@ -1086,52 +881,22 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginHorizontal: 16,
   },
-  banner: {
-    flex: 1,
-    width: "100%",
-  },
-  bannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: COLORS.overlay,
-  },
   tabContainer: {
     backgroundColor: COLORS.background.secondary,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.border,
-  },
-  tabScrollContent: {
-    paddingHorizontal: 16,
-  },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginRight: 8,
-    position: "relative",
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: `${COLORS.primary}08`,
+     elevation: 0,
+    shadowOpacity: 0,
   },
   tabText: {
     fontSize: 15,
-    color: COLORS.text.tertiary,
     fontWeight: "500",
-  },
-  activeTabText: {
-    color: COLORS.primary,
-    fontWeight: "600",
+    textTransform: 'none',
   },
   tabIndicator: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
     backgroundColor: COLORS.primary,
+    height: 2,
     borderRadius: 1,
-  },
-  tabContentContainer: {
-    flex: 1,
   },
   flex: {
     flex: 1,
@@ -1144,13 +909,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   pressedCard: {
     opacity: 0.8,
     transform: [{ scale: 0.99 }],
   },
   postHeader: {
-    flexDirection: I18nManager.isRTL ? "row-reverse" : "row",
+    flexDirection: "row",
     alignItems: "center",
     marginBottom: 12,
   },
@@ -1158,7 +928,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginHorizontal: 12,
+    marginRight: 12,
   },
   postInfo: {
     flex: 1,
@@ -1168,22 +938,19 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.text.primary,
     marginBottom: 2,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   postTime: {
     fontSize: 14,
     color: COLORS.text.tertiary,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   postContent: {
     fontSize: 16,
     color: COLORS.text.primary,
     lineHeight: 24,
     marginBottom: 16,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   postActions: {
-    flexDirection: I18nManager.isRTL ? "row-reverse" : "row",
+    flexDirection: "row",
     alignItems: "center",
   },
   actionButton: {
@@ -1203,14 +970,14 @@ const styles = StyleSheet.create({
     color: COLORS.error,
   },
   classroomHeader: {
-    flexDirection: I18nManager.isRTL ? "row-reverse" : "row",
+    flexDirection: "row",
     marginBottom: 16,
   },
   classroomThumbnail: {
     width: 60,
     height: 60,
     borderRadius: 8,
-    marginHorizontal: 12,
+    marginRight: 12,
   },
   classroomInfo: {
     flex: 1,
@@ -1220,23 +987,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.text.primary,
     marginBottom: 4,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   classroomInstructor: {
     fontSize: 14,
     color: COLORS.text.tertiary,
     marginBottom: 6,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   classroomDescription: {
     fontSize: 14,
     color: COLORS.text.secondary,
     lineHeight: 20,
     marginBottom: 8,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   classroomStats: {
-    flexDirection: I18nManager.isRTL ? "row-reverse" : "row",
+    flexDirection: "row",
   },
   classroomStat: {
     fontSize: 12,
@@ -1281,9 +1045,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   fileHeader: {
-    flexDirection: I18nManager.isRTL ? "row-reverse" : "row",
+    flexDirection: "row",
     alignItems: "center",
     flex: 1,
   },
@@ -1291,7 +1060,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    marginHorizontal: 12,
+    marginRight: 12,
   },
   fileIcon: {
     width: 40,
@@ -1299,7 +1068,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 12,
+    marginRight: 12,
   },
   fileInfo: {
     flex: 1,
@@ -1309,12 +1078,10 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: COLORS.text.primary,
     marginBottom: 4,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   fileMeta: {
     fontSize: 14,
     color: COLORS.text.tertiary,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   filterContainer: {
     maxHeight: 50,
@@ -1343,7 +1110,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   leaderboardCard: {
-    flexDirection: I18nManager.isRTL ? "row-reverse" : "row",
+    flexDirection: "row",
     alignItems: "center",
     backgroundColor: COLORS.background.secondary,
     borderRadius: 12,
@@ -1352,6 +1119,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: COLORS.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   topLeaderboardCard: {
     backgroundColor: "#FFF9E6",
@@ -1364,7 +1136,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background.tertiary,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 12,
+    marginRight: 12,
   },
   rankText: {
     fontSize: 14,
@@ -1378,7 +1150,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    marginHorizontal: 12,
+    marginRight: 12,
   },
   leaderboardInfo: {
     flex: 1,
@@ -1388,12 +1160,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.text.primary,
     marginBottom: 2,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   leaderboardPoints: {
     fontSize: 14,
     color: COLORS.text.tertiary,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   progressBadge: {
     flexDirection: "row",
@@ -1419,14 +1189,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.text.primary,
     marginBottom: 12,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   description: {
     fontSize: 16,
     color: COLORS.text.secondary,
     lineHeight: 24,
     marginBottom: 24,
-    textAlign: I18nManager.isRTL ? "right" : "left",
   },
   statsContainer: {
     flexDirection: "row",
@@ -1466,16 +1234,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
-  },
-  scrollToTopButton: {
-    position: "absolute",
-    right: 24,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary,
-    alignItems: "center",
-    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
 });
 
