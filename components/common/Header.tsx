@@ -10,6 +10,7 @@ import {
   Platform 
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { shortName } from '@/lib/shortName';
 
 // Set RTL to true for Arabic
 I18nManager.forceRTL(true);
@@ -42,9 +43,7 @@ const Header: React.FC<HeaderProps> = ({
   plan,
   avatarUrl
 }) => {
-  const shortName = (name: string, maxLength: number = 1) => {
-    return name.substring(0, maxLength).toUpperCase();
-  };
+ 
 
   return (
     <View style={styles.wrapper}>
@@ -100,7 +99,7 @@ const Header: React.FC<HeaderProps> = ({
             <View style={styles.userInfo}>
               <View style={styles.namePlan}>
                 <Text style={styles.nameText} numberOfLines={1}>
-                  {name}
+                  {shortName(name, 5)}
                 </Text>
                 {!!plan && (
                   <Text style={styles.planText}>{plan}</Text>

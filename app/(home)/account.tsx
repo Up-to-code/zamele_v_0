@@ -15,216 +15,242 @@ import {
   View,
 } from "react-native";
 
+// Import Convex hooks
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { useAuth } from "@clerk/clerk-expo";
+
 // Force RTL layout for Arabic
 I18nManager.forceRTL(true);
 I18nManager.allowRTL(true);
 
 const colorPalette = {
-  primaryBlue: "#007AFF",
-  secondaryPurple: "#5856D6",
-  textBlack: "#000000",
-  backgroundGray: "#F2F2F7",
-  cardWhite: "#FFFFFF",
-  borderLightGray: "#C6C6C8",
-  textSecondaryGray: "#8E8E93",
-  systemOrange: "#FF9500",
+  primary: "#007AFF",
+  background: "#FFFFFF",
+  card: "#F8F9FA",
+  text: "#1C1C1E",
+  textSecondary: "#8E8E93",
+  border: "#E5E5EA",
+  error: "#FF3B30", // Red color for unverified badge
 };
 
 const ProfileScreen = () => {
+  const { userId } = useAuth();
   const userProfileData = useUserStore();
 
-  // Simple email shortening function
+  // Fetch user data from Convex
+  const userData = useQuery(
+    api.users.getByClerkId, 
+    userId ? { clerkUserId: userId } : "skip"
+  );
+
+  // Or use the comprehensive profile query
+  const userProfile = useQuery(
+    api.users.getUserProfile,
+    userId ? { clerkUserId: userId } : "skip"
+  );
+
+  // Mutation for updating user points (example)
+  const addPoints = useMutation(api.users.addUserPoints);
+
   const shortName = (email: string) => {
-    return email.split('@')[0];
+    const username = email.split('@')[0];
+    // Limit to 20 characters and add ellipsis if longer
+    return username.length > 20 ? username.substring(0, 20) + '...' : username;
   };
 
-  const profileMenuOptions = [
+  const menuItems = [
     {
       id: "1",
       title: "مجموعاتي",
       icon: "people-outline",
-      color: colorPalette.primaryBlue,
+      path: "/(screens)/groups",
     },
     {
       id: "2",
       title: "الأصدقاء",
       icon: "person-outline",
-      color: colorPalette.primaryBlue,
+      path: "/(screens)/friends",
     },
     {
       id: "3",
       title: "الإعدادات",
       icon: "settings-outline",
-      color: colorPalette.primaryBlue,
       path: "/(screens)/settings",
     },
     {
       id: "4",
       title: "تعديل الملف",
       icon: "create-outline",
-      color: colorPalette.primaryBlue,
       path: "/(screens)/account/EditAccountScreen",
     },
     {
       id: "5",
       title: "المساعدة",
       icon: "help-circle-outline",
-      color: colorPalette.primaryBlue,
       path: "/(screens)/help/",
     },
     {
       id: "6",
       title: "السياسات",
-      color: colorPalette.primaryBlue,
-      path: "/(screens)/policies",
       icon: "document-text-outline",
+      path: "/(screens)/policies",
     },
   ];
 
   const handleEmailCopy = async () => {
-    await Clipboard.setStringAsync(userProfileData.email);
-  };
-
-  const handleEmailSend = () => {
-    Linking.openURL(`mailto:${userProfileData.email}`);
+    const email = userData?.email || userProfileData.email;
+    await Clipboard.setStringAsync(email);
   };
 
   const navigateToScreen = (menuItem: any) => {
-
-    
     if (menuItem.path) {
       router.push(menuItem.path as any);
     }
   };
 
-  return (
-    <View style={styles.screenContainer}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={colorPalette.backgroundGray}
-      />
+  // Use Convex data if available, fallback to local store
+  const displayName = userData?.name || userProfileData.name;
+  const displayEmail = userData?.email || userProfileData.email;
+  const displayAvatar = userData?.avatarUrl || userProfileData.avatarUrl;
+  const isVerified = userData?.isVerified || userProfileData.isVerified;
+  const userPoints = userData?.points || 0;
+  const userTags = userData?.tags || [];
 
-      <ScrollView
-        style={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-        contentInsetAdjustmentBehavior="automatic"
-      >
-        {/* Profile Header Section */}
-        <View style={styles.profileHeaderSection}>
-          <View style={styles.profileImageContainer}>
-            {userProfileData.avatarUrl ? (
+  // Handle adding points (example function)
+  const handleAddPoints = async () => {
+    if (userId) {
+      try {
+        await addPoints({ clerkUserId: userId, pointsToAdd: 10 });
+      } catch (error) {
+        console.error("Error adding points:", error);
+      }
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={colorPalette.background} />
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Header Section */}
+        <View style={styles.header}>
+          <View style={styles.avatarContainer}>
+            {displayAvatar ? (
               <Image
-                source={{ uri: userProfileData.avatarUrl }}
-                style={styles.profileImage}
+                source={{ uri: displayAvatar }}
+                style={styles.avatar}
               />
             ) : (
               <Image
                 source={require("@/assets/images/avatar.png")}
-                style={styles.profileImage}
+                style={styles.avatar}
               />
             )}
-
-            <TouchableOpacity style={styles.profileImageEditButton}>
+            <TouchableOpacity style={styles.editIcon}>
               <Ionicons name="camera" size={16} color="white" />
             </TouchableOpacity>
           </View>
           
-          <View style={styles.userInformation}>
-            <Text style={styles.userNameText}>{userProfileData.name}</Text>
-            <TouchableOpacity 
-              style={styles.emailContainer}
-              onPress={handleEmailCopy}
-            >
-              <Text style={styles.userEmailText}>
-                {shortName(userProfileData.email)}
-              </Text>
-              <Ionicons name="copy-outline" size={14} color={colorPalette.textSecondaryGray} />
+          <Text style={styles.name}>{displayName}</Text>
+          
+          {/* Display user points if available */}
+          {userPoints > 0 && (
+            <View style={styles.pointsContainer}>
+              <Ionicons name="trophy" size={16} color="#FFD700" />
+              <Text style={styles.pointsText}>{userPoints} نقطة</Text>
+            </View>
+          )}
+
+          <TouchableOpacity style={styles.emailRow} onPress={handleEmailCopy}>
+            <Text style={styles.email}>{shortName(displayEmail)}</Text>
+            <Ionicons name="copy-outline" size={16} color={colorPalette.textSecondary} />
+          </TouchableOpacity>
+
+          {!isVerified && (
+            <TouchableOpacity style={styles.verifyBadge}>
+              <Ionicons name="warning" size={14} color={colorPalette.error} />
+              <Text style={styles.verifyText}>حساب غير موثق</Text>
             </TouchableOpacity>
-            
-            {/* Verification Status Badge */}
-            {!userProfileData.isVerified && (
-              <TouchableOpacity 
-                style={styles.verificationBadge}
-                onPress={() => router.push("/(screens)/policies")}
-              >
-                <Ionicons name="warning" size={14} color={colorPalette.systemOrange} />
-                <Text style={styles.verificationText}>حساب غير موثق</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          )}
+
+          {/* Display user tags if available */}
+          {userTags.length > 0 && (
+            <View style={styles.tagsContainer}>
+              {userTags.slice(0, 3).map((tag, index) => (
+                <View key={index} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
-        {/* Quick Actions Section */}
-        <View style={styles.quickActionsContainer}>
-          <View style={styles.quickActionsRow}>
-            <TouchableOpacity style={styles.quickActionButton}>
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: `${colorPalette.primaryBlue}15` },
-                ]}
-              >
-                <Ionicons name="share-outline" size={20} color={colorPalette.primaryBlue} />
-              </View>
-              <Text style={styles.quickActionText}>مشاركة</Text>
-            </TouchableOpacity>
+        {/* Quick Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.actionButton}>
+            <View style={styles.actionIcon}>
+              <Ionicons name="share-outline" size={22} color={colorPalette.primary} />
+            </View>
+            <Text style={styles.actionText}>مشاركة</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionButton}>
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: `${colorPalette.primaryBlue}15` },
-                ]}
-              >
-                <Ionicons name="person-add-outline" size={20} color={colorPalette.primaryBlue} />
-              </View>
-              <Text style={styles.quickActionText}>إضافة</Text>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.actionButton}>
+            <View style={styles.actionIcon}>
+              <Ionicons name="person-add-outline" size={22} color={colorPalette.primary} />
+            </View>
+            <Text style={styles.actionText}>إضافة</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.quickActionButton}
-              onPress={handleEmailSend}
-            >
-              <View
-                style={[
-                  styles.quickActionIcon,
-                  { backgroundColor: `${colorPalette.primaryBlue}15` },
-                ]}
-              >
-                <Ionicons name="mail-outline" size={20} color={colorPalette.primaryBlue} />
-              </View>
-              <Text style={styles.quickActionText}>بريد</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.actionButton} onPress={() => Linking.openURL(`mailto:${displayEmail}`)}>
+            <View style={styles.actionIcon}>
+              <Ionicons name="mail-outline" size={22} color={colorPalette.primary} />
+            </View>
+            <Text style={styles.actionText}>بريد</Text>
+          </TouchableOpacity>
+
+          {/* Example: Add points button */}
+          <TouchableOpacity style={styles.actionButton} onPress={handleAddPoints}>
+            <View style={styles.actionIcon}>
+              <Ionicons name="add-circle-outline" size={22} color={colorPalette.primary} />
+            </View>
+            <Text style={styles.actionText}>نقاط</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Menu Options Section */}
-        <View style={styles.menuOptionsContainer}>
-          {profileMenuOptions.map((menuItem) => (
+        {/* Stats Section - Show if userProfile data is available */}
+        {userProfile?.stats && (
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{userProfile.stats.postCount}</Text>
+              <Text style={styles.statLabel}>منشور</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{userProfile.stats.commentCount}</Text>
+              <Text style={styles.statLabel}>تعليق</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{userProfile.stats.communityCount}</Text>
+              <Text style={styles.statLabel}>مجموعة</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Menu Items */}
+        <View style={styles.menu}>
+          {menuItems.map((item) => (
             <TouchableOpacity
-              key={menuItem.id}
-              style={styles.menuOptionItem}
-              onPress={() => navigateToScreen(menuItem)}
+              key={item.id}
+              style={styles.menuItem}
+              onPress={() => navigateToScreen(item)}
             >
-              <View
-                style={[
-                  styles.menuOptionIconContainer,
-                  { backgroundColor: `${menuItem.color}15` },
-                ]}
-              >
-                <Ionicons
-                  name={menuItem.icon as any}
-                  size={20}
-                  color={menuItem.color}
-                />
+              <View style={styles.menuLeft}>
+                <View style={styles.menuIcon}>
+                  <Ionicons name={item.icon as any} size={20} color={colorPalette.primary} />
+                </View>
+                <Text style={styles.menuText}>{item.title}</Text>
               </View>
-              <Text style={styles.menuOptionText}>{menuItem.title}</Text>
-              <View style={styles.flexSpacer} />
-              <Ionicons
-                name="chevron-back"
-                size={16}
-                color={colorPalette.borderLightGray}
-              />
+              <Ionicons name="chevron-back" size={16} color={colorPalette.border} />
             </TouchableOpacity>
           ))}
         </View>
@@ -234,138 +260,188 @@ const ProfileScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  screenContainer: {
+  container: {
     flex: 1,
-    backgroundColor: colorPalette.backgroundGray,
+    backgroundColor: colorPalette.background,
   },
-  scrollContainer: {
+  scrollView: {
     flex: 1,
-    paddingTop: Platform.OS === "ios" ? 0 : (StatusBar.currentHeight || 0) + 20,
   },
-  profileHeaderSection: {
-    flexDirection: "row-reverse",
+  header: {
     alignItems: "center",
-    padding: 20,
-    marginBottom: 16,
-    backgroundColor: colorPalette.cardWhite,
-    borderBottomWidth: 1,
-    borderBottomColor: colorPalette.borderLightGray,
+    padding: 24,
+    backgroundColor: colorPalette.background,
   },
-  profileImageContainer: {
+  avatarContainer: {
     position: "relative",
-    marginLeft: 16,
+    marginBottom: 16,
   },
-  profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 0.5,
-    borderColor: colorPalette.borderLightGray,
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 1,
+    borderColor: colorPalette.border,
   },
-  profileImageEditButton: {
+  editIcon: {
     position: "absolute",
     bottom: 0,
     right: 0,
-    backgroundColor: colorPalette.primaryBlue,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    backgroundColor: colorPalette.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: colorPalette.cardWhite,
+    borderColor: colorPalette.background,
   },
-  userInformation: {
-    flex: 1,
-    alignItems: "flex-end",
-  },
-  userNameText: {
-    fontSize: 22,
+  name: {
+    fontSize: 24,
     fontWeight: "600",
-    color: colorPalette.textBlack,
-    marginBottom: 4,
+    color: colorPalette.text,
+    marginBottom: 8,
     fontFamily: "Cairo-Bold",
   },
-  emailContainer: {
+  pointsContainer: {
     flexDirection: "row-reverse",
     alignItems: "center",
+    backgroundColor: "#FFF9E6",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 8,
   },
-  userEmailText: {
-    fontSize: 15,
-    color: colorPalette.textSecondaryGray,
-    marginLeft: 4,
-    fontFamily: "Cairo-Regular",
-  },
-  verificationBadge: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    backgroundColor: "#FFF4E5",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  verificationText: {
-    fontSize: 12,
-    color: colorPalette.systemOrange,
+  pointsText: {
+    fontSize: 14,
+    color: "#E6B800",
     marginRight: 4,
     fontFamily: "Cairo-SemiBold",
   },
-  menuOptionsContainer: {
-    backgroundColor: colorPalette.cardWhite,
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginBottom: 24,
-    overflow: "hidden",
-  },
-  menuOptionItem: {
+  emailRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 0.5,
-    borderBottomColor: colorPalette.borderLightGray,
+    marginBottom: 12,
   },
-  menuOptionIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 12,
-  },
-  menuOptionText: {
+  email: {
     fontSize: 16,
-    color: colorPalette.textBlack,
-    marginRight: 12,
+    color: colorPalette.textSecondary,
+    marginLeft: 6,
+    fontFamily: "Cairo-Regular",
+    maxWidth: 200, // Ensure it doesn't overflow
+  },
+  verifyBadge: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    backgroundColor: "#FFE5E5", // Light red background
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#FFCDD2", // Slightly darker red border
+  },
+  verifyText: {
+    fontSize: 12,
+    color: colorPalette.error, // Red text color
+    marginRight: 4,
+    fontFamily: "Cairo-SemiBold",
+  },
+  tagsContainer: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  tag: {
+    backgroundColor: "#007AFF15",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 6,
+    marginBottom: 4,
+  },
+  tagText: {
+    fontSize: 12,
+    color: colorPalette.primary,
     fontFamily: "Cairo-Regular",
   },
-  flexSpacer: {
-    flex: 1,
-  },
-  quickActionsContainer: {
-    backgroundColor: colorPalette.cardWhite,
-    paddingVertical: 16,
-    marginBottom: 16,
-  },
-  quickActionsRow: {
+  actions: {
     flexDirection: "row-reverse",
     justifyContent: "space-around",
+    padding: 16,
+    backgroundColor: colorPalette.background,
   },
-  quickActionButton: {
+  actionButton: {
     alignItems: "center",
   },
-  quickActionIcon: {
+  actionIcon: {
     width: 56,
     height: 56,
     borderRadius: 16,
+    backgroundColor: "#007AFF15",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 6,
   },
-  quickActionText: {
+  actionText: {
     fontSize: 12,
-    color: colorPalette.textSecondaryGray,
+    color: colorPalette.textSecondary,
+    fontFamily: "Cairo-Regular",
+  },
+  statsContainer: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-around",
+    padding: 20,
+    backgroundColor: colorPalette.card,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+  },
+  statItem: {
+    alignItems: "center",
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: colorPalette.primary,
+    fontFamily: "Cairo-Bold",
+  },
+  statLabel: {
+    fontSize: 14,
+    color: colorPalette.textSecondary,
+    marginTop: 4,
+    fontFamily: "Cairo-Regular",
+  },
+  menu: {
+    backgroundColor: colorPalette.background,
+    marginTop: 8,
+  },
+  menuItem: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colorPalette.border,
+  },
+  menuLeft: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+  },
+  menuIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#007AFF15",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+  menuText: {
+    fontSize: 16,
+    color: colorPalette.text,
     fontFamily: "Cairo-Regular",
   },
 });

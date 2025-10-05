@@ -11,7 +11,7 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 
 // Define types for our data
-type EventCard = {
+interface EventItem {
   id: string;
   title: string;
   description: string;
@@ -19,29 +19,114 @@ type EventCard = {
   location: string;
   image: string;
   price: string;
-};
+}
 
-type CourseCard = {
+interface CourseItem {
   id: string;
   title: string;
   description: string;
   duration: string;
   students: number;
   image: string;
-};
+}
 
-type Category = {
+interface CategoryItem {
   id: string;
   name: string;
   icon: string;
   color: string;
-};
+}
 
-const EventsTab = () => {
+// Event Card Component Props
+interface EventCardProps {
+  event: EventItem;
+  cardWidth: number;
+  onPress: () => void;
+}
+
+// Course Card Component Props
+interface CourseCardProps {
+  course: CourseItem;
+  cardWidth: number;
+  onPress: () => void;
+}
+
+// Event Card Component
+const EventCard: React.FC<EventCardProps> = ({ event, cardWidth, onPress }) => (
+  <TouchableOpacity 
+    style={[styles.card, { width: cardWidth }]} 
+    onPress={onPress}
+    activeOpacity={0.9}
+  >
+    <Image 
+      source={{ uri: event.image }} 
+      style={styles.cardImage}
+      resizeMode="cover"
+    />
+    <View style={styles.cardContent}>
+      <View style={styles.priceTag}>
+        <Text style={styles.priceText}>{event.price}</Text>
+      </View>
+      <Text style={styles.cardTitle}>{event.title}</Text>
+      <Text style={styles.cardDescription} numberOfLines={2}>
+        {event.description}
+      </Text>
+      <View style={styles.cardDetails}>
+        <View style={styles.detailItem}>
+          <Ionicons name="calendar-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>{event.date}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Ionicons name="location-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>{event.location}</Text>
+        </View>
+      </View>
+      <TouchableOpacity style={styles.primaryButton}>
+        <Text style={styles.buttonText}>سجل الآن</Text>
+      </TouchableOpacity>
+    </View>
+  </TouchableOpacity>
+);
+
+// Course Card Component
+const CourseCard: React.FC<CourseCardProps> = ({ course, cardWidth, onPress }) => (
+  <TouchableOpacity 
+    style={[styles.card, { width: cardWidth }]} 
+    onPress={onPress}
+    activeOpacity={0.9}
+  >
+    <Image 
+      source={{ uri: course.image }} 
+      style={styles.cardImage}
+      resizeMode="cover"
+    />
+    <View style={styles.cardContent}>
+      <Text style={styles.cardTitle}>{course.title}</Text>
+      <Text style={styles.cardDescription} numberOfLines={2}>
+        {course.description}
+      </Text>
+      <View style={styles.cardDetails}>
+        <View style={styles.detailItem}>
+          <Ionicons name="time-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>{course.duration}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Ionicons name="people-outline" size={16} color="#666" />
+          <Text style={styles.detailText}>{course.students} طالب</Text>
+        </View>
+      </View>
+      <TouchableOpacity style={styles.secondaryButton}>
+        <Text style={styles.buttonText}>إنضم الآن</Text>
+      </TouchableOpacity>
+    </View>
+  </TouchableOpacity>
+);
+
+const EventsTab: React.FC = () => {
   const { width } = useWindowDimensions();
 
   // Sample data for events
-  const events: EventCard[] = [
+  const events: EventItem[] = [
     {
       id: '1',
       title: 'ندوة التكنولوجيا',
@@ -72,7 +157,7 @@ const EventsTab = () => {
   ];
 
   // Sample data for courses
-  const courses: CourseCard[] = [
+  const courses: CourseItem[] = [
     {
       id: '1',
       title: 'دورة تطوير التطبيقات',
@@ -100,7 +185,7 @@ const EventsTab = () => {
   ];
 
   // Categories data
-  const categories: Category[] = [
+  const categories: CategoryItem[] = [
     { id: '1', name: 'موسيقى', icon: 'musical-notes', color: '#ff6b6b' },
     { id: '2', name: 'أعمال', icon: 'business', color: '#4ecdc4' },
     { id: '3', name: 'تعليم', icon: 'school', color: '#ffd166' },
@@ -236,93 +321,6 @@ const EventsTab = () => {
     </View>
   );
 };
-
-// Event Card Component
-const EventCard = ({ 
-  event, 
-  cardWidth, 
-  onPress 
-}: { 
-  event: EventCard; 
-  cardWidth: number;
-  onPress: () => void;
-}) => (
-  <TouchableOpacity 
-    style={[styles.card, { width: cardWidth }]} 
-    onPress={onPress}
-    activeOpacity={0.9}
-  >
-    <Image 
-      source={{ uri: event.image }} 
-      style={styles.cardImage}
-      resizeMode="cover"
-    />
-    <View style={styles.cardContent}>
-      <View style={styles.priceTag}>
-        <Text style={styles.priceText}>{event.price}</Text>
-      </View>
-      <Text style={styles.cardTitle}>{event.title}</Text>
-      <Text style={styles.cardDescription} numberOfLines={2}>
-        {event.description}
-      </Text>
-      <View style={styles.cardDetails}>
-        <View style={styles.detailItem}>
-          <Ionicons name="calendar-outline" size={16} color="#666" />
-          <Text style={styles.detailText}>{event.date}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="location-outline" size={16} color="#666" />
-          <Text style={styles.detailText}>{event.location}</Text>
-        </View>
-      </View>
-      <TouchableOpacity style={styles.primaryButton}>
-        <Text style={styles.buttonText}>سجل الآن</Text>
-      </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-);
-
-// Course Card Component
-const CourseCard = ({ 
-  course, 
-  cardWidth, 
-  onPress 
-}: { 
-  course: CourseCard; 
-  cardWidth: number;
-  onPress: () => void;
-}) => (
-  <TouchableOpacity 
-    style={[styles.card, { width: cardWidth }]} 
-    onPress={onPress}
-    activeOpacity={0.9}
-  >
-    <Image 
-      source={{ uri: course.image }} 
-      style={styles.cardImage}
-      resizeMode="cover"
-    />
-    <View style={styles.cardContent}>
-      <Text style={styles.cardTitle}>{course.title}</Text>
-      <Text style={styles.cardDescription} numberOfLines={2}>
-        {course.description}
-      </Text>
-      <View style={styles.cardDetails}>
-        <View style={styles.detailItem}>
-          <Ionicons name="time-outline" size={16} color="#666" />
-          <Text style={styles.detailText}>{course.duration}</Text>
-        </View>
-        <View style={styles.detailItem}>
-          <Ionicons name="people-outline" size={16} color="#666" />
-          <Text style={styles.detailText}>{course.students} طالب</Text>
-        </View>
-      </View>
-      <TouchableOpacity style={styles.secondaryButton}>
-        <Text style={styles.buttonText}>إنضم الآن</Text>
-      </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-);
 
 const styles = StyleSheet.create({
   container: {

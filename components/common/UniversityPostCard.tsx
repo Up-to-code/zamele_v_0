@@ -1,5 +1,6 @@
 import type { FeedPost } from "@/types/feed";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React from "react";
 import {
   Image,
@@ -114,6 +115,7 @@ const UniversityPostCard: React.FC<UniversityPostCardProps> = ({
 
   return (
     <View style={styles.card}>
+      <TouchableOpacity onPress={() =>  router.push(`/user/${user.id}`)}>
       <View style={[styles.headerRow, styles.rtlRow]}>
         {user.avatarUrl ? (
           <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
@@ -140,7 +142,8 @@ const UniversityPostCard: React.FC<UniversityPostCardProps> = ({
             {createdAt}
           </Text>
         </View>
-      </View>
+      </View></TouchableOpacity>
+
 
       {!!text && <Text style={[styles.text, styles.rtlText]}>{text}</Text>}
 

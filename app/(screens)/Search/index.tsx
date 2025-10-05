@@ -6,11 +6,12 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "@/config/constants/colors";
 import { ArabicTranslations } from "@/config/constants/translations";
-import { FilterState, ResultType } from "./types";
+import { FilterState } from "./types";
 
 interface FilterModalProps {
   visible: boolean;
@@ -32,275 +33,238 @@ const FilterModal: React.FC<FilterModalProps> = ({
   applyFilters,
   resetFilters,
 }) => {
+  // Apple-style color system
+  const appleColors = {
+    systemBlue: "#007AFF",
+    systemGray: "#8E8E93",
+    systemGray2: "#AEAEB2",
+    systemGray3: "#C7C7CC",
+    systemGray4: "#D1D1D6",
+    systemGray5: "#E5E5EA",
+    systemGray6: "#F2F2F7",
+    systemBackground: "#FFFFFF",
+    label: "#000000",
+    secondaryLabel: "#3C3C4399",
+  };
+
   const getSortLabel = (sort: string) => {
-    switch (sort) {
-      case "relevance":
-        return ArabicTranslations.relevance;
-      case "rating":
-        return ArabicTranslations.rating;
-      case "newest":
-        return ArabicTranslations.newest;
-      case "price_low":
-        return ArabicTranslations.priceLow;
-      case "price_high":
-        return ArabicTranslations.priceHigh;
-      default:
-        return sort;
-    }
+    const sortLabels: { [key: string]: string } = {
+      relevance: ArabicTranslations.relevance,
+      rating: ArabicTranslations.rating,
+      newest: ArabicTranslations.newest,
+      price_low: ArabicTranslations.priceLow,
+      price_high: ArabicTranslations.priceHigh,
+    };
+    return sortLabels[sort] || sort;
   };
 
   const getTypeLabel = (type: string) => {
-    switch (type) {
-      case "all":
-        return ArabicTranslations.all;
-      case "account":
-        return ArabicTranslations.accounts;
-      case "group":
-        return ArabicTranslations.groups;
-      case "course":
-        return ArabicTranslations.courses;
-      case "event":
-        return ArabicTranslations.events;
-      default:
-        return type;
-    }
+    const typeLabels: { [key: string]: string } = {
+      all: ArabicTranslations.all,
+      account: ArabicTranslations.accounts,
+      group: ArabicTranslations.groups,
+      course: ArabicTranslations.courses,
+      event: ArabicTranslations.events,
+    };
+    return typeLabels[type] || type;
   };
 
   const getPriceLabel = (price: string) => {
-    switch (price) {
-      case "any":
-        return ArabicTranslations.any;
-      case "free":
-        return ArabicTranslations.free;
-      case "paid":
-        return ArabicTranslations.paid;
-      default:
-        return price;
-    }
+    const priceLabels: { [key: string]: string } = {
+      any: ArabicTranslations.any,
+      free: ArabicTranslations.free,
+      paid: ArabicTranslations.paid,
+    };
+    return priceLabels[price] || price;
   };
+
+  const FilterSection = ({ 
+    title, 
+    children 
+  }: { 
+    title: string; 
+    children: React.ReactNode;
+  }) => (
+    <View style={styles.filterSection}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+      <View style={styles.sectionContent}>
+        {children}
+      </View>
+    </View>
+  );
+
+  const FilterOption = ({ 
+    label, 
+    isSelected, 
+    onPress 
+  }: { 
+    label: string; 
+    isSelected: boolean; 
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      style={[styles.optionButton, isSelected && styles.optionButtonSelected]}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: isSelected }}
+    >
+      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+        {label}
+      </Text>
+      {isSelected && (
+        <Ionicons 
+          name="checkmark" 
+          size={20} 
+          color={appleColors.systemBlue} 
+          style={styles.checkmark}
+        />
+      )}
+    </TouchableOpacity>
+  );
+
+  const SwitchOption = ({ 
+    label, 
+    value, 
+    onToggle 
+  }: { 
+    label: string; 
+    value: boolean; 
+    onToggle: () => void;
+  }) => (
+    <View style={styles.switchContainer}>
+      <Text style={styles.switchLabel}>{label}</Text>
+      <TouchableOpacity
+        style={[styles.switch, value && styles.switchOn]}
+        onPress={onToggle}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: value }}
+      >
+        <View style={[styles.switchThumb, value && styles.switchThumbOn]} />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <Modal
       animationType="slide"
+      presentationStyle="pageSheet"
       transparent={true}
       visible={visible}
       onRequestClose={onRequestClose}
       accessibilityViewIsModal={true}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle} accessibilityRole="header">
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerDragHandle} />
+          <View style={styles.headerContent}>
+            <Text style={styles.title} accessibilityRole="header">
               {ArabicTranslations.filters}
             </Text>
             <TouchableOpacity
               onPress={onRequestClose}
-              accessibilityLabel="إغلاق الفلاتر"
+              style={styles.closeButton}
+              accessibilityLabel="إغلاق"
               accessibilityRole="button"
             >
-              <Ionicons name="close" size={24} color={colors.darkGray} />
+              <Ionicons name="close" size={24} color={appleColors.systemBlue} />
             </TouchableOpacity>
           </View>
+        </View>
 
-          <ScrollView style={styles.filterOptions}>
-            <View style={styles.filterSection}>
-              <Text
-                style={styles.filterSectionTitle}
-                accessibilityRole="header"
-              >
-                {ArabicTranslations.type}
-              </Text>
-              <View style={styles.filterOptionsRow}>
-                {["all", "account", "group", "course", "event"].map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.filterOption,
-                      filters.type === type && styles.selectedFilterOption,
-                    ]}
-                    onPress={() => handleFilterChange("type", type)}
-                    accessibilityLabel={getTypeLabel(type)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: filters.type === type }}
-                  >
-                    <Text
-                      style={[
-                        styles.filterOptionText,
-                        filters.type === type &&
-                          styles.selectedFilterOptionText,
-                      ]}
-                    >
-                      {getTypeLabel(type)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+        <ScrollView 
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="automatic"
+        >
+          {/* Type Filter */}
+          <FilterSection title={ArabicTranslations.type}>
+            <View style={styles.optionsGrid}>
+              {["all", "account", "group", "course", "event"].map((type) => (
+                <FilterOption
+                  key={type}
+                  label={getTypeLabel(type)}
+                  isSelected={filters.type === type}
+                  onPress={() => handleFilterChange("type", type)}
+                />
+              ))}
             </View>
+          </FilterSection>
 
-            <View style={styles.filterSection}>
-              <Text
-                style={styles.filterSectionTitle}
-                accessibilityRole="header"
-              >
-                {ArabicTranslations.sortBy}
-              </Text>
-              <View style={styles.filterOptionsColumn}>
-                {[
-                  "relevance",
-                  "rating",
-                  "newest",
-                  "price_low",
-                  "price_high",
-                ].map((sort) => (
-                  <TouchableOpacity
-                    key={sort}
-                    style={[
-                      styles.filterOption,
-                      filters.sort === sort && styles.selectedFilterOption,
-                    ]}
-                    onPress={() => handleFilterChange("sort", sort)}
-                    accessibilityLabel={getSortLabel(sort)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: filters.sort === sort }}
-                  >
-                    <Text
-                      style={[
-                        styles.filterOptionText,
-                        filters.sort === sort &&
-                          styles.selectedFilterOptionText,
-                      ]}
-                    >
-                      {getSortLabel(sort)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+          {/* Sort Filter */}
+          <FilterSection title={ArabicTranslations.sortBy}>
+            <View style={styles.optionsList}>
+              {["relevance", "rating", "newest", "price_low", "price_high"].map((sort) => (
+                <FilterOption
+                  key={sort}
+                  label={getSortLabel(sort)}
+                  isSelected={filters.sort === sort}
+                  onPress={() => handleFilterChange("sort", sort)}
+                />
+              ))}
             </View>
+          </FilterSection>
 
-            <View style={styles.filterSection}>
-              <Text
-                style={styles.filterSectionTitle}
-                accessibilityRole="header"
-              >
-                {ArabicTranslations.price}
-              </Text>
-              <View style={styles.filterOptionsRow}>
-                {["any", "free", "paid"].map((price) => (
-                  <TouchableOpacity
-                    key={price}
-                    style={[
-                      styles.filterOption,
-                      filters.price === price && styles.selectedFilterOption,
-                    ]}
-                    onPress={() => handleFilterChange("price", price)}
-                    accessibilityLabel={getPriceLabel(price)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: filters.price === price }}
-                  >
-                    <Text
-                      style={[
-                        styles.filterOptionText,
-                        filters.price === price &&
-                          styles.selectedFilterOptionText,
-                      ]}
-                    >
-                      {getPriceLabel(price)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+          {/* Price Filter */}
+          <FilterSection title={ArabicTranslations.price}>
+            <View style={styles.optionsGrid}>
+              {["any", "free", "paid"].map((price) => (
+                <FilterOption
+                  key={price}
+                  label={getPriceLabel(price)}
+                  isSelected={filters.price === price}
+                  onPress={() => handleFilterChange("price", price)}
+                />
+              ))}
             </View>
+          </FilterSection>
 
-            <View style={styles.filterSection}>
-              <Text
-                style={styles.filterSectionTitle}
-                accessibilityRole="header"
-              >
-                {ArabicTranslations.minimumRating}
-              </Text>
-              <View style={styles.filterOptionsRow}>
-                {["any", "4", "3", "2"].map((rating) => (
-                  <TouchableOpacity
-                    key={rating}
-                    style={[
-                      styles.filterOption,
-                      filters.rating === rating && styles.selectedFilterOption,
-                    ]}
-                    onPress={() => handleFilterChange("rating", rating)}
-                    accessibilityLabel={
-                      rating === "any"
-                        ? ArabicTranslations.any
-                        : `${rating}+ ${ArabicTranslations.stars}`
-                    }
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: filters.rating === rating }}
-                  >
-                    <Text
-                      style={[
-                        styles.filterOptionText,
-                        filters.rating === rating &&
-                          styles.selectedFilterOptionText,
-                      ]}
-                    >
-                      {rating === "any"
-                        ? ArabicTranslations.any
-                        : `${rating}+ ${ArabicTranslations.stars}`}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.filterSection}>
-              <View style={styles.switchOption}>
-                <Text style={styles.switchOptionText}>
-                  {ArabicTranslations.freeOnly}
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleSwitch,
-                    filters.freeOnly && styles.toggleSwitchActive,
-                  ]}
-                  onPress={() =>
-                    handleFilterChange("freeOnly", !filters.freeOnly)
+          {/* Rating Filter */}
+          <FilterSection title={ArabicTranslations.minimumRating}>
+            <View style={styles.optionsGrid}>
+              {["any", "4", "3", "2"].map((rating) => (
+                <FilterOption
+                  key={rating}
+                  label={
+                    rating === "any" 
+                      ? ArabicTranslations.any 
+                      : `${rating}+ ${ArabicTranslations.stars}`
                   }
-                  accessibilityLabel={ArabicTranslations.freeOnly}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: filters.freeOnly }}
-                >
-                  <View
-                    style={[
-                      styles.toggleKnob,
-                      filters.freeOnly && styles.toggleKnobActive,
-                    ]}
-                  />
-                </TouchableOpacity>
-              </View>
+                  isSelected={filters.rating === rating}
+                  onPress={() => handleFilterChange("rating", rating)}
+                />
+              ))}
             </View>
-          </ScrollView>
+          </FilterSection>
 
-          <View style={styles.modalActions}>
-            <TouchableOpacity
-              style={styles.resetButton}
-              onPress={resetFilters}
-              accessibilityLabel={ArabicTranslations.reset}
-              accessibilityRole="button"
-            >
-              <Text style={styles.resetButtonText}>
-                {ArabicTranslations.reset}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.applyButton}
-              onPress={applyFilters}
-              accessibilityLabel={ArabicTranslations.applyFilters}
-              accessibilityRole="button"
-            >
-              <Text style={styles.applyButtonText}>
-                {ArabicTranslations.applyFilters}
-              </Text>
-            </TouchableOpacity>
+          {/* Free Only Toggle */}
+          <View style={styles.toggleSection}>
+            <SwitchOption
+              label={ArabicTranslations.freeOnly}
+              value={filters.freeOnly}
+              onToggle={() => handleFilterChange("freeOnly", !filters.freeOnly)}
+            />
           </View>
+        </ScrollView>
+
+        {/* Action Buttons */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.resetButton}
+            onPress={resetFilters}
+            accessibilityLabel={ArabicTranslations.reset}
+            accessibilityRole="button"
+          >
+            <Text style={styles.resetButtonText}>{ArabicTranslations.reset}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.applyButton}
+            onPress={applyFilters}
+            accessibilityLabel={ArabicTranslations.applyFilters}
+            accessibilityRole="button"
+          >
+            <Text style={styles.applyButtonText}>{ArabicTranslations.applyFilters}</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -308,134 +272,178 @@ const FilterModal: React.FC<FilterModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
+    backgroundColor: "#F2F2F7",
+    marginTop: Platform.OS === 'ios' ? 44 : 0,
   },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "80%",
+  header: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
-  modalHeader: {
+  headerDragHandle: {
+    width: 36,
+    height: 5,
+    backgroundColor: "#C6C6C8",
+    borderRadius: 3,
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  headerContent: {
     flexDirection: "row-reverse",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.lightGray,
+    paddingHorizontal: 16,
   },
-  modalTitle: {
+  title: {
     fontSize: 20,
+    fontWeight: "600",
+    color: "#000000",
     fontFamily: "Cairo_Bold",
-    color: colors.darkGray,
-    textAlign: "right",
   },
-  filterOptions: {
-    padding: 20,
+  closeButton: {
+    padding: 4,
+  },
+  scrollView: {
+    flex: 1,
   },
   filterSection: {
-    marginBottom: 24,
+    backgroundColor: "#FFFFFF",
+    marginTop: 16,
+    paddingVertical: 8,
   },
-  filterSectionTitle: {
-    fontSize: 16,
-    fontFamily: "Cairo_Bold",
-    color: colors.darkGray,
-    marginBottom: 12,
-    textAlign: "right",
+  sectionHeader: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#000000",
+    fontFamily: "Cairo_SemiBold",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#FFFFFF",
   },
-  filterOptionsRow: {
+  sectionContent: {
+    backgroundColor: "#FFFFFF",
+  },
+  optionsGrid: {
     flexDirection: "row-reverse",
     flexWrap: "wrap",
+    paddingHorizontal: 12,
     gap: 8,
   },
-  filterOptionsColumn: {
-    gap: 8,
+  optionsList: {
+    paddingHorizontal: 8,
   },
-  filterOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: colors.lightGray,
-    minWidth: 80,
+  optionButton: {
+    flexDirection: "row-reverse",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: "transparent",
+    marginHorizontal: 8,
   },
-  selectedFilterOption: {
-    backgroundColor: colors.primary,
+  optionButtonSelected: {
+    backgroundColor: "#007AFF15",
   },
-  filterOptionText: {
-    fontSize: 14,
-    fontFamily: "Cairo_Medium",
-    color: colors.darkGray,
-    textAlign: "center",
+  optionText: {
+    fontSize: 17,
+    color: "#000000",
+    fontFamily: "Cairo_Regular",
+    flex: 1,
+    textAlign: "right",
   },
-  selectedFilterOptionText: {
-    color: colors.white,
+  optionTextSelected: {
+    color: "#007AFF",
+    fontFamily: "Cairo_SemiBold",
   },
-  switchOption: {
+  checkmark: {
+    marginLeft: 8,
+  },
+  toggleSection: {
+    backgroundColor: "#FFFFFF",
+    marginTop: 16,
+    paddingVertical: 12,
+  },
+  switchContainer: {
     flexDirection: "row-reverse",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  switchOptionText: {
-    fontSize: 16,
-    fontFamily: "Cairo_Medium",
-    color: colors.darkGray,
+  switchLabel: {
+    fontSize: 17,
+    color: "#000000",
+    fontFamily: "Cairo_Regular",
+    flex: 1,
     textAlign: "right",
   },
-  toggleSwitch: {
-    width: 50,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.lightGray,
+  switch: {
+    width: 51,
+    height: 31,
+    borderRadius: 16,
+    backgroundColor: "#E9E9EA",
     padding: 2,
     justifyContent: "center",
   },
-  toggleSwitchActive: {
-    backgroundColor: colors.primary,
+  switchOn: {
+    backgroundColor: "#007AFF",
   },
-  toggleKnob: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.white,
+  switchThumb: {
+    width: 27,
+    height: 27,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 1,
   },
-  toggleKnobActive: {
+  switchThumbOn: {
     alignSelf: "flex-end",
   },
-  modalActions: {
+  footer: {
     flexDirection: "row-reverse",
-    padding: 20,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
     borderTopWidth: 1,
-    borderTopColor: colors.lightGray,
+    borderTopColor: "#C6C6C8",
     gap: 12,
   },
   resetButton: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: colors.lightGray,
-    borderRadius: 12,
+    backgroundColor: "transparent",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#C6C6C8",
   },
   resetButtonText: {
-    fontSize: 16,
-    fontFamily: "Cairo_Bold",
-    color: colors.darkGray,
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#007AFF",
+    fontFamily: "Cairo_SemiBold",
   },
   applyButton: {
     flex: 1,
-    padding: 16,
+    paddingVertical: 12,
     alignItems: "center",
-    backgroundColor: colors.primary,
-    borderRadius: 12,
+    backgroundColor: "#007AFF",
+    borderRadius: 10,
   },
   applyButtonText: {
-    fontSize: 16,
-    fontFamily: "Cairo_Bold",
-    color: colors.white,
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    fontFamily: "Cairo_SemiBold",
   },
 });
 
