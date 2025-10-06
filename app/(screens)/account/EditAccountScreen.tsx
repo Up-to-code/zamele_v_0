@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, JSX } from "react";
+// screens/account/EditAccountScreen.tsx
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,303 +8,259 @@ import {
   Image,
   ScrollView,
   StatusBar,
-  Platform,
   TextInput,
   Alert,
   ActivityIndicator,
   Switch,
-  Modal,
-  FlatList,
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
   Keyboard,
-  Dimensions,
-  ImageSourcePropType,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-
-const { width, height } = Dimensions.get("window");
-
-const colorPalette = {
-  primaryBlue: "#007AFF",
-  secondaryPurple: "#5856D6",
-  textBlack: "#000000",
-  backgroundGray: "#F2F2F7",
-  cardWhite: "#FFFFFF",
-  borderLightGray: "#C6C6C8",
-  textSecondaryGray: "#8E8E93",
-  errorRed: "#FF3B30",
-  successGreen: "#34C759",
-};
-
-// Mock data for universities and sections
-interface Option {
-  label: string;
-  value: string;
-}
-
-const MOCK_UNIVERSITIES: Option[] = [
-  { label: "جامعة الملك سعود", value: "uni_1" },
-  { label: "جامعة الملك فهد", value: "uni_2" },
-  { label: "جامعة الأميرة نورة", value: "uni_3" },
-];
-
-const MOCK_SECTIONS: Option[] = [
-  { label: "قسم علوم الحاسب", value: "sec_1" },
-  { label: "قسم الهندسة", value: "sec_2" },
-  { label: "قسم إدارة الأعمال", value: "sec_3" },
-];
-
-const YEAR_OPTIONS: Option[] = [
-  { label: "السنة الأولى", value: "1" },
-  { label: "السنة الثانية", value: "2" },
-  { label: "السنة الثالثة", value: "3" },
-  { label: "السنة الرابعة", value: "4" },
-  { label: "خريج", value: "5" },
-];
-
-const PLAN_OPTIONS: Option[] = [
-  { label: "مجاني", value: "free" },
-  { label: "مميز", value: "pro" },
-  { label: "الأقصى", value: "max" },
-];
-
-type UserType = "student" | "teacher";
-type PlanType = "free" | "pro" | "max";
-
-interface FormData {
-  name: string;
-  userType: UserType;
-  universityId: string | null;
-  sectionId: string | null;
-  year: string;
-  isVerified: boolean;
-  plan: PlanType;
-}
-
-interface UserProfileData {
-  name: string;
-  userType: UserType;
-  universityId: string | null;
-  sectionId: string | null;
-  year: string;
-  isVerified: boolean;
-  plan: PlanType;
-  avatarUrl: string | null;
-}
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
+import { useAuth } from "@clerk/clerk-expo";
+import { useUserStore } from "@/lib/store/userStore";
+import { router } from "expo-router";
+import { 
+  University, 
+  Section, 
+  FormData, 
+  UserType, 
+  PlanType, 
+  PickerOption 
+} from "@/types";
+import { colors, YEAR_OPTIONS, PLAN_OPTIONS } from "@/constants";
+import { PickerModal } from "@/components";
+import { selectImageFromGallery, takePhotoWithCamera, uploadImageToConvex } from "@/utils";
+ 
 
 const EditAccountScreen: React.FC = () => {
-  const [isUpdating, setIsUpdating] = useState<boolean>(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [showPicker, setShowPicker] = useState<boolean>(false);
-  const [pickerType, setPickerType] = useState<"university" | "section" | "year" | "plan" | null>(null);
+  const { userId } = useAuth();
+  const userStore = useUserStore();
   
-  // Mock user data
-  const [userProfileData, setUserProfileData] = useState<UserProfileData>({
-    name: "أحمد محمد",
-    userType: "student",
-    universityId: "uni_1",
-    sectionId: "sec_1",
-    year: "3",
-    isVerified: true,
-    plan: "free",
-    avatarUrl: null,
-  });
+  // Convex queries and mutations
+  const userData = useQuery(
+    api.users.getByClerkId, 
+    userId ? { clerkUserId: userId } : "skip"
+  );
+  
+  const universities = useQuery(api.universities.list) || [];
+  const sections = useQuery(api.sections.list) || [];
+  const updateProfile = useMutation(api.users.updateProfile);
+  const generateUploadUrl = useMutation(api.users.generateUploadUrl);
+
+  // State management
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerType, setPickerType] = useState<"university" | "section" | "year" | "plan" | null>(null);
+
+  // Get user data with fallbacks
+  const displayName = userData?.name || userStore.name || "";
+  const displayAvatar = userData?.avatarUrl || userStore.avatarUrl;
+  const isVerified = userData?.isVerified || userStore.isVerified || false;
+  const userType = (userData?.userType || userStore.userType || "student") as UserType;
+  const universityId = userData?.universityId || userStore.universityId || null;
+  const sectionId = userData?.sectionId || userStore.sectionId || null;
+  const year = userData?.year || userStore.year || "1";
+  const plan = (userData?.plan || userStore.plan || "free") as PlanType;
 
   // Form state
   const [formData, setFormData] = useState<FormData>({
-    name: userProfileData.name,
-    userType: userProfileData.userType,
-    universityId: userProfileData.universityId,
-    sectionId: userProfileData.sectionId,
-    year: userProfileData.year,
-    isVerified: userProfileData.isVerified,
-    plan: userProfileData.plan,
+    name: displayName,
+    userType,
+    universityId,
+    sectionId,
+    year,
+    isVerified,
+    plan,
   });
 
+  // Update form when data changes
   useEffect(() => {
     setFormData({
-      name: userProfileData.name,
-      userType: userProfileData.userType,
-      universityId: userProfileData.universityId,
-      sectionId: userProfileData.sectionId,
-      year: userProfileData.year,
-      isVerified: userProfileData.isVerified,
-      plan: userProfileData.plan,
+      name: displayName,
+      userType,
+      universityId,
+      sectionId,
+      year,
+      isVerified,
+      plan,
     });
-  }, [userProfileData]);
+  }, [userData, userStore]);
 
-  const handleInputChange = (field: keyof FormData, value: string | boolean | UserType) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  // Handle form input changes
+  const handleInputChange = (field: keyof FormData, value: any) => {
+    setFormData((prev: FormData) => ({ ...prev, [field]: value }));
   };
 
-  const selectProfileImage = async (): Promise<void> => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (!permissionResult.granted) {
-        Alert.alert("يجب منح الإذن للوصول إلى الصور");
-        return;
-      }
-
-      const pickerResult = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!pickerResult.canceled) {
-        setSelectedImage(pickerResult.assets[0].uri);
-      }
-    } catch (error) {
-      Alert.alert("خطأ", "فشل في اختيار الصورة");
+  // Handle image selection
+  const handleSelectImage = async () => {
+    const imageUri = await selectImageFromGallery();
+    if (imageUri) {
+      setSelectedImage(imageUri);
     }
   };
 
-  const takeProfilePhoto = async (): Promise<void> => {
-    try {
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-      
-      if (!permissionResult.granted) {
-        Alert.alert("يجب منح الإذن للوصول إلى الكاميرا");
-        return;
-      }
-
-      const pickerResult = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!pickerResult.canceled) {
-        setSelectedImage(pickerResult.assets[0].uri);
-      }
-    } catch (error) {
-      Alert.alert("خطأ", "فشل في التقاط الصورة");
+  // Handle photo capture
+  const handleTakePhoto = async () => {
+    const imageUri = await takePhotoWithCamera();
+    if (imageUri) {
+      setSelectedImage(imageUri);
     }
   };
 
-  const handleSaveChanges = async (): Promise<void> => {
+  // Save profile changes
+  const handleSaveChanges = async () => {
+    if (!userId) {
+      Alert.alert("خطأ", "لم يتم العثور على معرف المستخدم");
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      Alert.alert("خطأ", "الاسم مطلوب");
+      return;
+    }
+
     setIsUpdating(true);
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Update user data
-      setUserProfileData({
-        ...userProfileData,
+      let avatarStorageId: Id<"_storage"> | undefined = undefined;
+
+      // Upload new image if selected
+      if (selectedImage) {
+        const storageId = await uploadImageToConvex(
+          () => generateUploadUrl(),
+          selectedImage
+        );
+        if (storageId) {
+          avatarStorageId = storageId;
+        } else {
+          Alert.alert("خطأ", "فشل في رفع الصورة");
+          return;
+        }
+      }
+
+      // Prepare update data
+      const updateData = {
+        clerkUserId: userId,
         name: formData.name,
         userType: formData.userType,
-        universityId: formData.universityId,
-        sectionId: formData.sectionId,
         year: formData.year,
         isVerified: formData.isVerified,
         plan: formData.plan,
-        avatarUrl: selectedImage || userProfileData.avatarUrl,
-      });
+        ...(formData.universityId && { universityId: formData.universityId as Id<"universities"> }),
+        ...(formData.sectionId && { sectionId: formData.sectionId as Id<"sections"> }),
+        ...(avatarStorageId && { avatarStorageId }),
+      };
+
+      // Update profile in Convex
+      await updateProfile(updateData);
       
-      Alert.alert("تم الحفظ", "تم تحديث بياناتك بنجاح");
+      Alert.alert("تم الحفظ", "تم تحديث بياناتك الشخصية بنجاح", [
+        { text: "حسناً", onPress: () => router.back() }
+      ]);
     } catch (error) {
-      Alert.alert("خطأ", "فشل في حفظ التغييرات");
+      console.error('Error updating profile:', error);
+      Alert.alert("خطأ", "فشل في حفظ التغييرات. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsUpdating(false);
     }
   };
 
-  const handleCancel = (): void => {
-    // Navigate back or close modal
+  // Handle cancel
+  const handleCancel = () => {
+    router.back();
   };
 
-  const openPicker = (type: "university" | "section" | "year" | "plan"): void => {
+  // Open picker
+  const openPicker = (type: "university" | "section" | "year" | "plan") => {
     setPickerType(type);
     setShowPicker(true);
   };
 
-  const handlePickerSelect = (value: string): void => {
-    if (pickerType === "university") {
-      handleInputChange("universityId", value);
-    } else if (pickerType === "section") {
-      handleInputChange("sectionId", value);
-    } else if (pickerType === "year") {
-      handleInputChange("year", value);
-    } else if (pickerType === "plan") {
-      handleInputChange("plan", value as PlanType);
-    }
-    setShowPicker(false);
-    setPickerType(null);
+  // Handle picker selection
+  const handlePickerSelect = (value: string) => {
+    if (!pickerType) return;
+
+    const fieldMap = {
+      university: "universityId",
+      section: "sectionId", 
+      year: "year",
+      plan: "plan"
+    } as const;
+
+    const field = fieldMap[pickerType];
+    handleInputChange(field, pickerType === "plan" ? value as PlanType : value);
   };
 
-  const getPickerData = (): Option[] => {
+  // Get picker data
+  const getPickerData = (): PickerOption[] => {
     switch (pickerType) {
-      case "university":
-        return MOCK_UNIVERSITIES;
-      case "section":
-        return MOCK_SECTIONS;
-      case "year":
+      case "university": 
+        return universities.map((uni: University) => ({ 
+          label: uni.nameAr || uni.nameEn || "", 
+          value: uni._id 
+        }));
+      case "section": 
+        return sections.map((sec: Section) => ({ 
+          label: sec.nameAr || sec.nameEn || "", 
+          value: sec._id 
+        }));
+      case "year": 
         return YEAR_OPTIONS;
-      case "plan":
+      case "plan": 
         return PLAN_OPTIONS;
-      default:
+      default: 
         return [];
     }
   };
 
+  // Get picker title
   const getPickerTitle = (): string => {
     switch (pickerType) {
-      case "university":
-        return "اختر الجامعة";
-      case "section":
-        return "اختر القسم";
-      case "year":
-        return "اختر السنة الدراسية";
-      case "plan":
-        return "اختر الخطة";
-      default:
-        return "اختر";
+      case "university": return "اختر الجامعة";
+      case "section": return "اختر القسم";
+      case "year": return "اختر السنة الدراسية";
+      case "plan": return "اختر الخطة";
+      default: return "اختر";
     }
   };
 
-  const renderPickerItem = ({ item }: { item: Option }): JSX.Element => (
-    <TouchableOpacity
-      style={styles.pickerItem}
-      onPress={() => handlePickerSelect(item.value)}
-    >
-      <Text style={styles.pickerItemText}>{item.label}</Text>
-      {((pickerType === "university" && formData.universityId === item.value) ||
-        (pickerType === "section" && formData.sectionId === item.value) ||
-        (pickerType === "year" && formData.year === item.value) ||
-        (pickerType === "plan" && formData.plan === item.value)) && (
-        <Ionicons name="checkmark" size={20} color={colorPalette.primaryBlue} />
-      )}
-    </TouchableOpacity>
-  );
+  // Get selected label
+  const getSelectedLabel = (type: "university" | "section" | "year" | "plan"): string => {
+    const data = getPickerData();
+    const selectedValue = formData[`${type}Id` as keyof FormData] || formData[type as keyof FormData];
+    const selected = data.find((item: PickerOption) => item.value === selectedValue);
+    return selected?.label || `اختر ${getPickerTitle().split(' ')[1]}`;
+  };
 
-  const handleClosePicker = useCallback((): void => {
+  // Close picker
+  const handleClosePicker = useCallback(() => {
     setShowPicker(false);
     setPickerType(null);
   }, []);
 
   return (
-    <SafeAreaView style={styles.screenContainer} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colorPalette.backgroundGray} />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
       
       {/* Header */}
-      <View style={styles.headerContainer}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.headerButton}>
-          <Ionicons name="close" size={24} color={colorPalette.textBlack} />
+          <Ionicons name="close" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>تعديل الملف الشخصي</Text>
         <TouchableOpacity 
           onPress={handleSaveChanges} 
-          style={[styles.headerButton, isUpdating && styles.disabledButton]}
+          style={[styles.saveButton, isUpdating && styles.disabledButton]}
           disabled={isUpdating}
         >
           {isUpdating ? (
-            <ActivityIndicator size="small" color={colorPalette.primaryBlue} />
+            <ActivityIndicator size="small" color={colors.card} />
           ) : (
             <Text style={styles.saveButtonText}>حفظ</Text>
           )}
@@ -311,66 +268,68 @@ const EditAccountScreen: React.FC = () => {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardAvoidingView}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+        behavior="padding"
+        style={styles.keyboardView}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView 
-            style={styles.scrollContainer} 
+            style={styles.scrollView}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
           >
             {/* Profile Image Section */}
-            <View style={styles.profileImageSection}>
-              <View style={styles.profileImageContainer}>
-                {selectedImage ? (
-                  <Image source={{ uri: selectedImage }} style={styles.profileImage} />
-                ) : userProfileData.avatarUrl ? (
-                  <Image source={{ uri: userProfileData.avatarUrl }} style={styles.profileImage} />
+            <View style={styles.profileSection}>
+              <View style={styles.avatarContainer}>
+                {selectedImage || displayAvatar ? (
+                  <Image 
+                    source={{ uri: selectedImage || displayAvatar || undefined }} 
+                    style={styles.avatar} 
+                  />
                 ) : (
                   <View style={styles.defaultAvatar}>
-                    <Ionicons name="person" size={50} color={colorPalette.textSecondaryGray} />
+                    <Ionicons name="person" size={40} color={colors.textSecondary} />
                   </View>
                 )}
+                <TouchableOpacity style={styles.editAvatarButton} onPress={handleSelectImage}>
+                  <Ionicons name="camera" size={16} color={colors.card} />
+                </TouchableOpacity>
               </View>
 
-              <View style={styles.imageButtonsContainer}>
-                <TouchableOpacity 
-                  style={styles.imageActionButton}
-                  onPress={selectProfileImage}
-                >
-                  <Ionicons name="image" size={20} color={colorPalette.primaryBlue} />
-                  <Text style={styles.imageActionText}>اختر صورة</Text>
-                </TouchableOpacity>
+              <Text style={styles.userName}>{formData.name}</Text>
+              <Text style={styles.userEmail}>{userData?.email || ""}</Text>
 
-                <TouchableOpacity 
-                  style={styles.imageActionButton}
-                  onPress={takeProfilePhoto}
-                >
-                  <Ionicons name="camera" size={20} color={colorPalette.primaryBlue} />
-                  <Text style={styles.imageActionText}>التقط صورة</Text>
+              <View style={styles.imageButtons}>
+                <TouchableOpacity style={styles.imageButton} onPress={handleSelectImage}>
+                  <Ionicons name="image-outline" size={18} color={colors.primary} />
+                  <Text style={styles.imageButtonText}>معرض الصور</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.imageButton} onPress={handleTakePhoto}>
+                  <Ionicons name="camera-outline" size={18} color={colors.primary} />
+                  <Text style={styles.imageButtonText}>الكاميرا</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Form Section */}
-            <View style={styles.formContainer}>
+            <View style={styles.formSection}>
+              <Text style={styles.sectionTitle}>المعلومات الأساسية</Text>
+
+              {/* Name Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>الاسم الكامل</Text>
+                <Text style={styles.label}>الاسم الكامل</Text>
                 <TextInput
-                  style={styles.textInput}
+                  style={styles.input}
                   value={formData.name}
                   onChangeText={(text) => handleInputChange("name", text)}
                   placeholder="أدخل اسمك الكامل"
-                  placeholderTextColor={colorPalette.textSecondaryGray}
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
+              {/* User Type Selection */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>نوع المستخدم</Text>
-                <View style={styles.userTypeContainer}>
+                <Text style={styles.label}>نوع المستخدم</Text>
+                <View style={styles.userTypeButtons}>
                   <TouchableOpacity
                     style={[
                       styles.userTypeButton,
@@ -402,235 +361,255 @@ const EditAccountScreen: React.FC = () => {
                 </View>
               </View>
 
+              <Text style={styles.sectionTitle}>المعلومات الأكاديمية</Text>
+
+              {/* University Picker */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>الجامعة</Text>
-                <TouchableOpacity onPress={() => openPicker("university")} style={styles.pickerTouchable}>
-                  <View style={styles.pickerContainer}>
-                    <Text style={[
-                      styles.pickerText,
-                      !formData.universityId && styles.pickerPlaceholder
-                    ]}>
-                      {MOCK_UNIVERSITIES.find(u => u.value === formData.universityId)?.label || "اختر الجامعة"}
-                    </Text>
-                    <Ionicons name="chevron-down" size={20} color={colorPalette.textSecondaryGray} />
-                  </View>
+                <Text style={styles.label}>الجامعة</Text>
+                <TouchableOpacity onPress={() => openPicker("university")} style={styles.picker}>
+                  <Text style={[
+                    styles.pickerText,
+                    !formData.universityId && styles.pickerPlaceholder
+                  ]}>
+                    {getSelectedLabel("university")}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
+              {/* Section Picker */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>القسم</Text>
-                <TouchableOpacity onPress={() => openPicker("section")} style={styles.pickerTouchable}>
-                  <View style={styles.pickerContainer}>
-                    <Text style={[
-                      styles.pickerText,
-                      !formData.sectionId && styles.pickerPlaceholder
-                    ]}>
-                      {MOCK_SECTIONS.find(s => s.value === formData.sectionId)?.label || "اختر القسم"}
-                    </Text>
-                    <Ionicons name="chevron-down" size={20} color={colorPalette.textSecondaryGray} />
-                  </View>
+                <Text style={styles.label}>القسم</Text>
+                <TouchableOpacity onPress={() => openPicker("section")} style={styles.picker}>
+                  <Text style={[
+                    styles.pickerText,
+                    !formData.sectionId && styles.pickerPlaceholder
+                  ]}>
+                    {getSelectedLabel("section")}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
+              {/* Year Picker (only for students) */}
               {formData.userType === "student" && (
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>السنة الدراسية</Text>
-                  <TouchableOpacity onPress={() => openPicker("year")} style={styles.pickerTouchable}>
-                    <View style={styles.pickerContainer}>
-                      <Text style={[
-                        styles.pickerText,
-                        !formData.year && styles.pickerPlaceholder
-                      ]}>
-                        {YEAR_OPTIONS.find(y => y.value === formData.year)?.label || "اختر السنة"}
-                      </Text>
-                      <Ionicons name="chevron-down" size={20} color={colorPalette.textSecondaryGray} />
-                    </View>
+                  <Text style={styles.label}>السنة الدراسية</Text>
+                  <TouchableOpacity onPress={() => openPicker("year")} style={styles.picker}>
+                    <Text style={[
+                      styles.pickerText,
+                      !formData.year && styles.pickerPlaceholder
+                    ]}>
+                      {getSelectedLabel("year")}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
                   </TouchableOpacity>
                 </View>
               )}
 
+              <Text style={styles.sectionTitle}>الإعدادات</Text>
+
+              {/* Plan Picker */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>الخطة</Text>
-                <TouchableOpacity onPress={() => openPicker("plan")} style={styles.pickerTouchable}>
-                  <View style={styles.pickerContainer}>
-                    <Text style={[
-                      styles.pickerText,
-                      !formData.plan && styles.pickerPlaceholder
-                    ]}>
-                      {PLAN_OPTIONS.find(p => p.value === formData.plan)?.label || "اختر الخطة"}
-                    </Text>
-                    <Ionicons name="chevron-down" size={20} color={colorPalette.textSecondaryGray} />
-                  </View>
+                <Text style={styles.label}>الخطة</Text>
+                <TouchableOpacity onPress={() => openPicker("plan")} style={styles.picker}>
+                  <Text style={[
+                    styles.pickerText,
+                    !formData.plan && styles.pickerPlaceholder
+                  ]}>
+                    {getSelectedLabel("plan")}
+                  </Text>
+                  <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
+              {/* Verification Switch */}
               <View style={styles.switchGroup}>
-                <View style={styles.switchContainer}>
+                <View style={styles.switchRow}>
                   <Text style={styles.switchLabel}>الحساب موثق</Text>
                   <Switch
                     value={formData.isVerified}
                     onValueChange={(value) => handleInputChange("isVerified", value)}
-                    trackColor={{ false: "#767577", true: colorPalette.primaryBlue }}
+                    trackColor={{ false: colors.border, true: colors.primary }}
                   />
                 </View>
+                <Text style={styles.switchDescription}>
+                  الحساب الموثق يحصل على ميزات إضافية
+                </Text>
               </View>
             </View>
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      {/* Picker Modal with iOS-style bottom sheet */}
-      <Modal
+      {/* Picker Modal */}
+      <PickerModal
         visible={showPicker}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={handleClosePicker}
-      >
-        <View style={styles.modalContainer}>
-          <TouchableWithoutFeedback onPress={handleClosePicker}>
-            <View style={styles.modalOverlay} />
-          </TouchableWithoutFeedback>
-          
-          <View style={styles.modalContent}>
-            {/* Handle bar for iOS-style bottom sheet */}
-            <View style={styles.handleBar} />
-            
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{getPickerTitle()}</Text>
-              <TouchableOpacity onPress={handleClosePicker} style={styles.modalCloseButton}>
-                <Text style={styles.modalCloseText}>تم</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <FlatList
-              data={getPickerData()}
-              renderItem={renderPickerItem}
-              keyExtractor={(item) => item.value}
-              style={styles.pickerList}
-            />
-          </View>
-        </View>
-      </Modal>
+        title={getPickerTitle()}
+        options={getPickerData()}
+        selectedValue={
+          pickerType === "university" ? formData.universityId ?? undefined :
+          pickerType === "section" ? formData.sectionId ?? undefined :
+          pickerType === "year" ? formData.year ?? undefined :
+          pickerType === "plan" ? formData.plan ?? undefined :
+          undefined
+        }
+        onSelect={handlePickerSelect}
+        onClose={handleClosePicker}
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  screenContainer: {
+  container: {
     flex: 1,
-    backgroundColor: colorPalette.backgroundGray,
+    backgroundColor: colors.background,
   },
-  keyboardAvoidingView: {
+  keyboardView: {
     flex: 1,
   },
-  scrollContainer: {
+  scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    flexGrow: 1,
   },
-  headerContainer: {
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: colorPalette.cardWhite,
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: colorPalette.borderLightGray,
+    borderBottomColor: colors.border,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: colorPalette.textBlack,
+    color: colors.textPrimary,
   },
   headerButton: {
     padding: 8,
   },
-  disabledButton: {
-    opacity: 0.5,
+  saveButton: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   saveButtonText: {
-    color: colorPalette.primaryBlue,
-    fontSize: 16,
+    color: colors.card,
     fontWeight: "600",
   },
-  profileImageSection: {
+  disabledButton: {
+    opacity: 0.6,
+  },
+  profileSection: {
     alignItems: "center",
     paddingVertical: 24,
-    backgroundColor: colorPalette.cardWhite,
+    backgroundColor: colors.card,
     marginBottom: 16,
   },
-  profileImageContainer: {
+  avatarContainer: {
     position: "relative",
     marginBottom: 16,
   },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     borderWidth: 3,
-    borderColor: colorPalette.primaryBlue,
+    borderColor: colors.primary,
   },
   defaultAvatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colorPalette.backgroundGray,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.background,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 3,
-    borderColor: colorPalette.primaryBlue,
+    borderColor: colors.primary,
   },
-  imageButtonsContainer: {
-    flexDirection: "row",
+  editAvatarButton: {
+    position: "absolute",
+    bottom: 0,
+    right: 0,
+    backgroundColor: colors.primary,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
-    gap: 24,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: colors.card,
   },
-  imageActionButton: {
+  userName: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 16,
+  },
+  imageButtons: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  imageButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: `${colorPalette.primaryBlue}10`,
+    backgroundColor: `${colors.primary}15`,
     borderRadius: 8,
   },
-  imageActionText: {
-    color: colorPalette.primaryBlue,
+  imageButtonText: {
+    color: colors.primary,
     fontWeight: "500",
   },
-  formContainer: {
-    backgroundColor: colorPalette.cardWhite,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginBottom: 24,
-    borderRadius: 12,
+  formSection: {
+    backgroundColor: colors.card,
+    padding: 16,
     marginHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: colors.textPrimary,
+    marginBottom: 16,
+    marginTop: 8,
   },
   inputGroup: {
     marginBottom: 20,
   },
-  inputLabel: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: colorPalette.textBlack,
+  label: {
+    fontSize: 14,
     fontWeight: "600",
+    color: colors.textPrimary,
+    marginBottom: 8,
     textAlign: "right",
   },
-  textInput: {
-    backgroundColor: colorPalette.backgroundGray,
+  input: {
+    backgroundColor: colors.background,
     padding: 12,
     borderRadius: 8,
-    fontSize: 16,
-    textAlign: "right",
     borderWidth: 1,
-    borderColor: colorPalette.borderLightGray,
+    borderColor: colors.border,
+    textAlign: "right",
+    color: colors.textPrimary,
   },
-  userTypeContainer: {
+  userTypeButtons: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: colorPalette.backgroundGray,
+    backgroundColor: colors.background,
     borderRadius: 8,
     overflow: "hidden",
   },
@@ -640,111 +619,49 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   userTypeButtonActive: {
-    backgroundColor: colorPalette.primaryBlue,
+    backgroundColor: colors.primary,
   },
   userTypeText: {
     fontWeight: "500",
-    color: colorPalette.textSecondaryGray,
+    color: colors.textSecondary,
   },
   userTypeTextActive: {
-    color: colorPalette.cardWhite,
+    color: colors.card,
   },
-  pickerTouchable: {
-    marginTop: 4,
-  },
-  pickerContainer: {
+  picker: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: colorPalette.backgroundGray,
+    backgroundColor: colors.background,
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colorPalette.borderLightGray,
+    borderColor: colors.border,
   },
   pickerText: {
-    fontSize: 16,
-    color: colorPalette.textBlack,
+    color: colors.textPrimary,
     textAlign: "right",
   },
   pickerPlaceholder: {
-    color: colorPalette.textSecondaryGray,
+    color: colors.textSecondary,
   },
   switchGroup: {
-    marginTop: 16,
+    marginTop: 8,
   },
-  switchContainer: {
+  switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
+    marginBottom: 4,
   },
   switchLabel: {
-    fontSize: 16,
-    color: colorPalette.textBlack,
-    fontWeight: "500",
-    textAlign: "right",
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalContent: {
-    backgroundColor: colorPalette.cardWhite,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: "50%",
-    paddingBottom: 34,
-  },
-  handleBar: {
-    width: 40,
-    height: 5,
-    backgroundColor: colorPalette.borderLightGray,
-    borderRadius: 3,
-    alignSelf: "center",
-    marginTop: 10,
-    marginBottom: 5,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colorPalette.borderLightGray,
-  },
-  modalTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "600",
-    color: colorPalette.textBlack,
+    color: colors.textPrimary,
   },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalCloseText: {
-    color: colorPalette.primaryBlue,
-    fontSize: 17,
-    fontWeight: "600",
-  },
-  pickerList: {
-    maxHeight: height * 0.4,
-  },
-  pickerItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colorPalette.borderLightGray,
-  },
-  pickerItemText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: colorPalette.textBlack,
+  switchDescription: {
+    fontSize: 12,
+    color: colors.textSecondary,
     textAlign: "right",
   },
 });

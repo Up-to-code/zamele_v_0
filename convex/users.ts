@@ -19,7 +19,8 @@ async function getUserByClerkId(ctx: any, clerkUserId: string) {
 
 /**
  * Update specific user profile fields
- * This is the missing function that's causing the error
+ * This function provides a lightweight way to update only specific fields
+ * without having to provide all possible parameters
  */
 export const updateProfileFields = mutation({
   args: {
@@ -118,10 +119,10 @@ export const upsertFromClerk = mutation({
     year: v.optional(v.string()),
     avatarUrl: v.optional(v.string()),
     avatarStorageId: v.optional(v.id("_storage")),
-    isBlocked: v.optional(v.boolean()), // NEW: Block user status
+    isBlocked: v.optional(v.boolean()), // Block user status
     canCreateCommunity: v.optional(v.boolean()),
-    canCreateCourse: v.optional(v.boolean()), // NEW: Permission to create courses
-    canCreateUniversity: v.optional(v.boolean()), // NEW: Permission to create universities
+    canCreateCourse: v.optional(v.boolean()), // Permission to create courses
+    canCreateUniversity: v.optional(v.boolean()), // Permission to create universities
     isVerified: v.optional(v.boolean()),
     plan: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("max"))),
     points: v.optional(v.number()),
@@ -151,11 +152,11 @@ export const upsertFromClerk = mutation({
         year: args.year,
         avatarUrl,
         avatarStorageId: args.avatarStorageId,
-        isBlocked: args.isBlocked ?? existing.isBlocked ?? false, // NEW: Handle blocked status
+        isBlocked: args.isBlocked ?? existing.isBlocked ?? false,
         canComment: existing.canComment ?? true,
         canCreateCommunity: args.canCreateCommunity ?? existing.canCreateCommunity ?? false,
-        canCreateCourse: args.canCreateCourse ?? existing.canCreateCourse ?? false, // NEW: Handle course creation
-        canCreateUniversity: args.canCreateUniversity ?? existing.canCreateUniversity ?? false, // NEW: Handle university creation
+        canCreateCourse: args.canCreateCourse ?? existing.canCreateCourse ?? false,
+        canCreateUniversity: args.canCreateUniversity ?? existing.canCreateUniversity ?? false,
         isVerified: args.isVerified ?? existing.isVerified ?? false,
         isActive: existing.isActive ?? true,
         plan: args.plan ?? existing.plan ?? 'free',
@@ -180,11 +181,11 @@ export const upsertFromClerk = mutation({
       year: args.year,
       avatarUrl,
       avatarStorageId: args.avatarStorageId,
-      isBlocked: args.isBlocked ?? false, // NEW: Default to not blocked
+      isBlocked: args.isBlocked ?? false,
       canComment: true,
       canCreateCommunity: args.canCreateCommunity ?? false,
-      canCreateCourse: args.canCreateCourse ?? false, // NEW: Default no course creation
-      canCreateUniversity: args.canCreateUniversity ?? false, // NEW: Default no university creation
+      canCreateCourse: args.canCreateCourse ?? false,
+      canCreateUniversity: args.canCreateUniversity ?? false,
       isVerified: args.isVerified ?? false,
       isActive: true,
       plan: args.plan ?? "free",
@@ -244,10 +245,10 @@ export const updateProfile = mutation({
     name: v.optional(v.string()),
     userType: v.optional(v.union(v.literal("student"), v.literal("teacher"))),
     avatarStorageId: v.optional(v.id("_storage")),
-    isBlocked: v.optional(v.boolean()), // NEW: Can block/unblock user
+    isBlocked: v.optional(v.boolean()), // Can block/unblock user
     canCreateCommunity: v.optional(v.boolean()),
-    canCreateCourse: v.optional(v.boolean()), // NEW: Update course creation permission
-    canCreateUniversity: v.optional(v.boolean()), // NEW: Update university creation permission
+    canCreateCourse: v.optional(v.boolean()), // Update course creation permission
+    canCreateUniversity: v.optional(v.boolean()), // Update university creation permission
     isVerified: v.optional(v.boolean()),
     plan: v.optional(v.union(v.literal("free"), v.literal("pro"), v.literal("max"))),
     points: v.optional(v.number()),
@@ -262,10 +263,10 @@ export const updateProfile = mutation({
     if (args.year !== undefined) update.year = args.year;
     if (args.name !== undefined) update.name = args.name;
     if (args.userType !== undefined) update.userType = args.userType;
-    if (args.isBlocked !== undefined) update.isBlocked = args.isBlocked; // NEW: Handle blocking
+    if (args.isBlocked !== undefined) update.isBlocked = args.isBlocked;
     if (args.canCreateCommunity !== undefined) update.canCreateCommunity = args.canCreateCommunity;
-    if (args.canCreateCourse !== undefined) update.canCreateCourse = args.canCreateCourse; // NEW: Handle course permission
-    if (args.canCreateUniversity !== undefined) update.canCreateUniversity = args.canCreateUniversity; // NEW: Handle university permission
+    if (args.canCreateCourse !== undefined) update.canCreateCourse = args.canCreateCourse;
+    if (args.canCreateUniversity !== undefined) update.canCreateUniversity = args.canCreateUniversity;
     if (args.isVerified !== undefined) update.isVerified = args.isVerified;
     if (args.plan !== undefined) update.plan = args.plan;
     if (args.points !== undefined) update.points = args.points;
@@ -629,7 +630,7 @@ export const createComment = mutation({
     if (!post) throw new Error("Post not found");
 
     const parentComment = parentCommentId ? await ctx.db.get(parentCommentId) : null;
-    // FIX: Use nullish coalescing to handle undefined level
+    // Use nullish coalescing to handle undefined level
     const level = parentComment ? ((parentComment.level ?? 0) + 1) : 0;
 
     const commentId = await ctx.db.insert("comments", {
